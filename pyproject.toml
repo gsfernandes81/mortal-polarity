@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "mortal-polarity"
+version = "0.1"
+description = ""
+authors = ["GS <gsfernandes81@gmail.com>"]
+license = "GNU AGPL-3.0-or-later"
+
+[tool.poetry.dependencies]
+python = "~3.10.1"
+postgres = "*"
+psycopg2-binary = "*"
+psycopg2-pool = "*"
+asyncpg = "*"
+aiofiles = "*"
+alembic = "*"
+SQLAlchemy = "^1.4.35"
+hikari = { extras = ["speedups"], version = "^2.0.0-alpha.108" }
+
+[tool.poetry.dev-dependencies]
+pyflakes = "*"
+bandit = "*"
+black = "*"
+rope = "*"
+poetry-githooks = "^2.0.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.githooks]
+# Note: Run "poetry run githooks setup" every time you change this section
+# The without-hashes flag is necessary since private repos don't mix well
+# with pip hashes
+pre-commit = "poetry export -f requirements.txt -o requirements.txt --without-hashes && git add requirements.txt"
