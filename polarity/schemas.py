@@ -21,7 +21,7 @@ Base = declarative_base()
 
 
 class Commands(Base):
-    __tablename__ = "Commands"
+    __tablename__ = "commands"
     __mapper_args__ = {"eager_defaults": True}
     name = Column("name", String, primary_key=True)
     description = Column("description", String)
