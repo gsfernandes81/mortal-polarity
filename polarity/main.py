@@ -127,6 +127,42 @@ class add_command(CommandImpl):
         return event.interaction.command_name == "add"
 
 
+class del_command(CommandImpl):
+    @staticmethod
+    async def slash_builder() -> list:
+        return [
+            bot.rest.slash_command_builder(
+                # ToDo: Add permission checks
+                "delete",
+                "Delete a link command from the bot, only usable by Kyber et al",
+            ).add_option(
+                hikari.CommandOption(
+                    type=hikari.OptionType.STRING,
+                    name="name",
+                    is_required=True,
+                    description="Name of the link to delete",
+                )
+            ),
+        ]
+
+    @classmethod
+    async def handler(cls, event: hikari.Event):
+        assert event.interaction.options[0].name == "name"
+        name = event.interaction.options[0].value
+
+        async with db_session() as session:
+            async with session.begin():
+                await session.execute(delete(Commands).where(Commands.name == name))
+
+        await register_commands()
+        await event.interaction.edit_initial_response("Command deleted")
+        return
+
+    @staticmethod
+    async def is_matching_command(event: hikari.Event) -> bool:
+        return event.interaction.command_name == "delete"
+
+
 class user_command(CommandImpl):
     @staticmethod
     async def slash_builder():
@@ -180,7 +216,11 @@ async def register_commands_on_startup(event: hikari.StartingEvent) -> None:
 async def register_commands() -> None:
     """Register ping and info commands."""
     application = await bot.rest.fetch_application()
-    commands = await add_command.slash_builder() + await user_command.slash_builder()
+    commands = (
+        await add_command.slash_builder()
+        + await user_command.slash_builder()
+        + await del_command.slash_builder()
+    )
 
     await bot.rest.set_application_commands(
         application=application.id,
@@ -202,6 +242,8 @@ async def handle_interactions(event: hikari.InteractionCreateEvent) -> None:
 
     if await add_command.is_matching_command(event):
         await add_command.handler(event)
+    elif await del_command.is_matching_command(event):
+        await del_command.handler(event)
     elif await user_command.is_matching_command(event):
         await user_command.handler(event)
 
