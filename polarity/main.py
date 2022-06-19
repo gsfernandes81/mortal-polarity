@@ -13,7 +13,10 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
+from abc import ABC, abstractclassmethod, abstractmethod, abstractstaticmethod
+
 import hikari
+from sqlalchemy import false
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.expression import delete, select
@@ -30,71 +33,57 @@ bot = hikari.GatewayBot(token=cfg.main_token)
 COMMAND_GUILD_ID = cfg.test_env if cfg.test_env else hikari.UNDEFINED
 
 
-@bot.listen()
-async def register_commands_on_startup(event: hikari.StartingEvent) -> None:
-    await register_commands()
+class CommandImpl(ABC):
+    @abstractstaticmethod
+    async def slash_builder() -> list:
+        pass
+
+    @abstractclassmethod
+    async def handler(cls, event: hikari.Event):
+        pass
+
+    @abstractstaticmethod
+    async def is_matching_command(event: hikari.Event) -> bool:
+        pass
 
 
-async def register_commands() -> None:
-    """Register ping and info commands."""
-    application = await bot.rest.fetch_application()
-
-    async with db_session() as session:
-        async with session.begin():
-            command_list = (await session.execute(select(Commands))).fetchall()
-            command_list = [] if command_list is None else command_list
-            commands = [
-                bot.rest.slash_command_builder(
-                    "add", "Add a link to the bot, only usable by Kyber et al"
+class add_command(CommandImpl):
+    @staticmethod
+    async def slash_builder() -> list:
+        return [
+            bot.rest.slash_command_builder(
+                # ToDo: Add permission checks
+                "add",
+                "Add a link to the bot, only usable by Kyber et al",
+            )
+            .add_option(
+                hikari.CommandOption(
+                    type=hikari.OptionType.STRING,
+                    name="name",
+                    is_required=True,
+                    description="Name of the link to add",
                 )
-                .add_option(
-                    hikari.CommandOption(
-                        type=hikari.OptionType.STRING,
-                        name="name",
-                        is_required=True,
-                        description="Name of the link to add",
-                    )
+            )
+            .add_option(
+                hikari.CommandOption(
+                    type=hikari.OptionType.STRING,
+                    name="description",
+                    is_required=True,
+                    description="Description of what is in this link and commmand",
                 )
-                .add_option(
-                    hikari.CommandOption(
-                        type=hikari.OptionType.STRING,
-                        name="description",
-                        is_required=True,
-                        description="Description of what is in this link and commmand",
-                    )
+            )
+            .add_option(
+                hikari.CommandOption(
+                    type=hikari.OptionType.STRING,
+                    name="link",
+                    is_required=True,
+                    description="Link to post when this command is used",
                 )
-                .add_option(
-                    hikari.CommandOption(
-                        type=hikari.OptionType.STRING,
-                        name="link",
-                        is_required=True,
-                        description="Link to post when this command is used",
-                    )
-                )
-            ] + [
-                bot.rest.slash_command_builder(command[0].name, command[0].description)
-                for command in command_list
-            ]
+            ),
+        ]
 
-    await bot.rest.set_application_commands(
-        application=application.id,
-        commands=commands,
-        guild=COMMAND_GUILD_ID,
-    )
-
-
-@bot.listen()
-async def handle_interactions(event: hikari.InteractionCreateEvent) -> None:
-    """Listen for slash commands being executed."""
-    if not isinstance(event.interaction, hikari.CommandInteraction):
-        # only listen to command interactions, no others!
-        return
-
-    await event.interaction.create_initial_response(
-        hikari.ResponseType.MESSAGE_CREATE, f"Working..."
-    )
-
-    if event.interaction.command_name == "add":
+    @classmethod
+    async def handler(cls, event: hikari.Event):
         options = event.interaction.options
 
         # Sort the options into a dict
@@ -134,23 +123,87 @@ async def handle_interactions(event: hikari.InteractionCreateEvent) -> None:
         await event.interaction.edit_initial_response("Command added")
         return
 
-    async with db_session() as session:
-        async with session.begin():
-            matching_command = (
-                await session.execute(
-                    select(Commands).where(
-                        Commands.name == event.interaction.command_name
+    async def is_matching_command(event):
+        return event.interaction.command_name == "add"
+
+
+class user_command(CommandImpl):
+    @staticmethod
+    async def slash_builder():
+        async with db_session() as session:
+            async with session.begin():
+                command_list = (await session.execute(select(Commands))).fetchall()
+                command_list = [] if command_list is None else command_list
+                return [
+                    bot.rest.slash_command_builder(
+                        command[0].name, command[0].description
                     )
+                    for command in command_list
+                ]
+
+    @classmethod
+    async def handler(cls, event: hikari.Event):
+        async with db_session() as session:
+            async with session.begin():
+                matching_command = (
+                    await session.execute(
+                        select(Commands).where(
+                            Commands.name == event.interaction.command_name
+                        )
+                    )
+                ).fetchone()
+                command_text_response = matching_command[0].text
+                await event.interaction.edit_initial_response(
+                    command_text_response,
                 )
-            ).fetchone()
-            if matching_command is None:
-                # Put a warning message here if you don't find a commmand in the db
                 return
-            command_text_response = matching_command[0].text
-            await event.interaction.edit_initial_response(
-                command_text_response,
-            )
-            return
+
+    @staticmethod
+    async def is_matching_command(event):
+        async with db_session() as session:
+            async with session.begin():
+                matching_command = (
+                    await session.execute(
+                        select(Commands).where(
+                            Commands.name == event.interaction.command_name
+                        )
+                    )
+                ).fetchone()
+                return matching_command is not None
+
+
+@bot.listen()
+async def register_commands_on_startup(event: hikari.StartingEvent) -> None:
+    await register_commands()
+
+
+async def register_commands() -> None:
+    """Register ping and info commands."""
+    application = await bot.rest.fetch_application()
+    commands = await add_command.slash_builder() + await user_command.slash_builder()
+
+    await bot.rest.set_application_commands(
+        application=application.id,
+        commands=commands,
+        guild=COMMAND_GUILD_ID,
+    )
+
+
+@bot.listen()
+async def handle_interactions(event: hikari.InteractionCreateEvent) -> None:
+    """Listen for slash commands being executed."""
+    if not isinstance(event.interaction, hikari.CommandInteraction):
+        # only listen to command interactions, no others!
+        return
+
+    await event.interaction.create_initial_response(
+        hikari.ResponseType.MESSAGE_CREATE, f"Working..."
+    )
+
+    if await add_command.is_matching_command(event):
+        await add_command.handler(event)
+    elif await user_command.is_matching_command(event):
+        await user_command.handler(event)
 
 
 bot.run()
