@@ -17,6 +17,7 @@ import logging
 
 import hikari
 import lightbulb
+import uvloop
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.expression import delete, select
@@ -26,6 +27,8 @@ from .schemas import Commands
 
 db_engine = create_async_engine(cfg.db_url_async)
 db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
+
+uvloop.install()
 
 if cfg.test_env:
     # Only use the test env for testing if it is specified
