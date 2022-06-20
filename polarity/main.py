@@ -33,6 +33,7 @@ command_registry = {}
 
 
 @bot.command
+@lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
 @lightbulb.option("link", "Link to post when this command is used", type=str)
 @lightbulb.option(
     "description", "Description of what the command posts or does", type=str
@@ -78,6 +79,7 @@ async def add_command(ctx: lightbulb.Context) -> None:
 
 
 @bot.command
+@lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
 @lightbulb.option("name", "Name of the command to delete", type=str)
 @lightbulb.command(
     "delete",
@@ -130,6 +132,21 @@ async def register_commands_on_startup(event: hikari.StartingEvent):
 
                 bot.command(command_registry[command.name])
                 logging.info(command.name + " registered")
+
+
+@bot.listen(lightbulb.CommandErrorEvent)
+async def on_error(event: lightbulb.CommandErrorEvent):
+    if isinstance(event.exception, lightbulb.errors.MissingRequiredRole):
+        await event.context.respond("Permission denied")
+        logging.warning(
+            "Note: privlidged command access attempt by uid: {}, name: {}#{}".format(
+                event.context.user.id,
+                event.context.user.username,
+                event.context.user.discriminator,
+            )
+        )
+    else:
+        raise event.exception.__cause__ or event.exception
 
 
 bot.run()

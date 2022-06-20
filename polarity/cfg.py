@@ -34,3 +34,5 @@ if db_url.startswith("postgres"):
 db_session_kwargs = {"expire_on_commit": False, "class_": AsyncSession}
 
 test_env = int(_getenv("TEST_ENV")) if str(_getenv("TEST_ENV")) != "false" else False
+
+admin_role = int(_getenv("ADMIN_ROLE"))
