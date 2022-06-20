@@ -1,2 +1,2 @@
-web: python -m polarity.main
+clock: python -m polarity.main
 release: cd polarity && alembic upgrade head && cd ..
