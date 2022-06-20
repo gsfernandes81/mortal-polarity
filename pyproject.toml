@@ -15,6 +15,7 @@ aiofiles = "*"
 alembic = "*"
 SQLAlchemy = "^1.4.35"
 hikari = { extras = ["speedups"], version = "^2.0.0-alpha.108" }
+hikari-lightbulb = "^2.2.2"
 
 [tool.poetry.dev-dependencies]
 pyflakes = "*"

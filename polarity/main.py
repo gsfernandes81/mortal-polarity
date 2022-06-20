@@ -13,10 +13,10 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
-from abc import ABC, abstractclassmethod, abstractmethod, abstractstaticmethod
+import logging
 
 import hikari
-from sqlalchemy import false
+import lightbulb
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.expression import delete, select
@@ -27,225 +27,109 @@ from .schemas import Commands
 db_engine = create_async_engine(cfg.db_url_async)
 db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
 
-bot = hikari.GatewayBot(token=cfg.main_token)
-
-
 COMMAND_GUILD_ID = cfg.test_env if cfg.test_env else hikari.UNDEFINED
+bot = lightbulb.BotApp(token=cfg.main_token, default_enabled_guilds=COMMAND_GUILD_ID)
+command_registry = {}
 
 
-class CommandImpl(ABC):
-    @abstractstaticmethod
-    async def slash_builder() -> list:
-        pass
+@bot.command
+@lightbulb.option("link", "Link to post when this command is used", type=str)
+@lightbulb.option(
+    "description", "Description of what the command posts or does", type=str
+)
+@lightbulb.option("name", "Name of the command to add", type=str)
+@lightbulb.command(
+    "add", "Add a link to the bot, only usable by Kyber et al", auto_defer=True
+)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def add_command(ctx: lightbulb.Context) -> None:
+    name = ctx.options.name.lower()
+    description = ctx.options.description
+    text = ctx.options.link
 
-    @abstractclassmethod
-    async def handler(cls, event: hikari.Event):
-        pass
-
-    @abstractstaticmethod
-    async def is_matching_command(event: hikari.Event) -> bool:
-        pass
-
-
-class add_command(CommandImpl):
-    @staticmethod
-    async def slash_builder() -> list:
-        return [
-            bot.rest.slash_command_builder(
-                # ToDo: Add permission checks
-                "add",
-                "Add a link to the bot, only usable by Kyber et al",
+    async with db_session() as session:
+        async with session.begin():
+            additional_commands = (await session.execute(select(Commands))).fetchall()
+            additional_commands = (
+                [] if additional_commands is None else additional_commands
             )
-            .add_option(
-                hikari.CommandOption(
-                    type=hikari.OptionType.STRING,
-                    name="name",
-                    is_required=True,
-                    description="Name of the link to add",
-                )
-            )
-            .add_option(
-                hikari.CommandOption(
-                    type=hikari.OptionType.STRING,
-                    name="description",
-                    is_required=True,
-                    description="Description of what is in this link and commmand",
-                )
-            )
-            .add_option(
-                hikari.CommandOption(
-                    type=hikari.OptionType.STRING,
-                    name="link",
-                    is_required=True,
-                    description="Link to post when this command is used",
-                )
-            ),
-        ]
-
-    @classmethod
-    async def handler(cls, event: hikari.Event):
-        options = event.interaction.options
-
-        # Sort the options into a dict
-        options_dict = {}
-        for option in options:
-            options_dict[option.name] = option.value
-
-        async with db_session() as session:
-            async with session.begin():
-                additional_commands = (
-                    await session.execute(select(Commands))
-                ).fetchall()
-                additional_commands = (
-                    [] if additional_commands is None else additional_commands
-                )
-                additional_commands = [
-                    command[0].name
-                    for command in (await session.execute(select(Commands))).fetchall()
-                ]
-                if (
-                    options_dict["name"]
-                    in ["add", "edit", "remove"] + additional_commands
-                ):
-                    await event.interaction.edit_initial_response(
-                        "A command with that name already exists"
-                    )
-                    return
-
-                command = Commands(
-                    options_dict["name"].lower(),
-                    options_dict["description"],
-                    options_dict["link"],
-                )
-                session.add(command)
-
-        await register_commands()
-        await event.interaction.edit_initial_response("Command added")
-        return
-
-    async def is_matching_command(event):
-        return event.interaction.command_name == "add"
-
-
-class del_command(CommandImpl):
-    @staticmethod
-    async def slash_builder() -> list:
-        return [
-            bot.rest.slash_command_builder(
-                # ToDo: Add permission checks
-                "delete",
-                "Delete a link command from the bot, only usable by Kyber et al",
-            ).add_option(
-                hikari.CommandOption(
-                    type=hikari.OptionType.STRING,
-                    name="name",
-                    is_required=True,
-                    description="Name of the link to delete",
-                )
-            ),
-        ]
-
-    @classmethod
-    async def handler(cls, event: hikari.Event):
-        assert event.interaction.options[0].name == "name"
-        name = event.interaction.options[0].value
-
-        async with db_session() as session:
-            async with session.begin():
-                await session.execute(delete(Commands).where(Commands.name == name))
-
-        await register_commands()
-        await event.interaction.edit_initial_response("Command deleted")
-        return
-
-    @staticmethod
-    async def is_matching_command(event: hikari.Event) -> bool:
-        return event.interaction.command_name == "delete"
-
-
-class user_command(CommandImpl):
-    @staticmethod
-    async def slash_builder():
-        async with db_session() as session:
-            async with session.begin():
-                command_list = (await session.execute(select(Commands))).fetchall()
-                command_list = [] if command_list is None else command_list
-                return [
-                    bot.rest.slash_command_builder(
-                        command[0].name, command[0].description
-                    )
-                    for command in command_list
-                ]
-
-    @classmethod
-    async def handler(cls, event: hikari.Event):
-        async with db_session() as session:
-            async with session.begin():
-                matching_command = (
-                    await session.execute(
-                        select(Commands).where(
-                            Commands.name == event.interaction.command_name
-                        )
-                    )
-                ).fetchone()
-                command_text_response = matching_command[0].text
-                await event.interaction.edit_initial_response(
-                    command_text_response,
-                )
+            additional_commands = [command[0].name for command in additional_commands]
+            # ToDo: Update hardcoded command names
+            if name in ["add", "edit", "delete"] + additional_commands:
+                await ctx.respond("A command with that name already exists")
                 return
 
-    @staticmethod
-    async def is_matching_command(event):
-        async with db_session() as session:
-            async with session.begin():
-                matching_command = (
-                    await session.execute(
-                        select(Commands).where(
-                            Commands.name == event.interaction.command_name
-                        )
-                    )
-                ).fetchone()
-                return matching_command is not None
+            command = Commands(
+                name,
+                description,
+                text,
+            )
+            print(name, description, text)
+            session.add(command)
+
+            command_registry[command.name] = lightbulb.command(
+                command.name, command.description, auto_defer=True
+            )(lightbulb.implements(lightbulb.SlashCommand)(user_command))
+            bot.command(command_registry[command.name])
+            logging.info(command.name + " command registered")
+            await bot.sync_application_commands()
+
+    await ctx.respond("Command added")
 
 
-@bot.listen()
-async def register_commands_on_startup(event: hikari.StartingEvent) -> None:
-    await register_commands()
+@bot.command
+@lightbulb.option("name", "Name of the command to delete", type=str)
+@lightbulb.command(
+    "delete",
+    "Delete a command from the bot, only usable by Kyber et al",
+    auto_defer=True,
+)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def del_command(ctx: lightbulb.Context) -> None:
+    name = ctx.options.name.lower()
+
+    async with db_session() as session:
+        try:
+            command_registry.pop(name)
+        except KeyError:
+            await ctx.respond("No such command found")
+            return
+        async with session.begin():
+            await session.execute(delete(Commands).where(Commands.name == name))
+
+    bot.remove_command(command_registry[name])
+    await bot.sync_application_commands()
+    await ctx.respond("`{}`command deleted".format(name))
 
 
-async def register_commands() -> None:
-    """Register ping and info commands."""
-    application = await bot.rest.fetch_application()
-    commands = (
-        await add_command.slash_builder()
-        + await user_command.slash_builder()
-        + await del_command.slash_builder()
-    )
-
-    await bot.rest.set_application_commands(
-        application=application.id,
-        commands=commands,
-        guild=COMMAND_GUILD_ID,
-    )
+async def user_command(ctx: lightbulb.Context):
+    async with db_session() as session:
+        async with session.begin():
+            command = (
+                await session.execute(
+                    select(Commands.text).where(Commands.name == ctx.command.name)
+                )
+            ).fetchone()[0]
+    await ctx.respond(command)
 
 
-@bot.listen()
-async def handle_interactions(event: hikari.InteractionCreateEvent) -> None:
-    """Listen for slash commands being executed."""
-    if not isinstance(event.interaction, hikari.CommandInteraction):
-        # only listen to command interactions, no others!
-        return
+@bot.listen(hikari.StartingEvent)
+async def register_commands_on_startup(event: hikari.StartingEvent):
+    """Register additional text commands from db."""
+    logging.info("Registering commands")
+    async with db_session() as session:
+        async with session.begin():
+            command_list = (await session.execute(select(Commands))).fetchall()
+            command_list = [] if command_list is None else command_list
+            command_list = [command[0] for command in command_list]
+            for command in command_list:
 
-    await event.interaction.create_initial_response(
-        hikari.ResponseType.MESSAGE_CREATE, f"Working..."
-    )
+                command_registry[command.name] = lightbulb.command(
+                    command.name, command.description, auto_defer=True
+                )(lightbulb.implements(lightbulb.SlashCommand)(user_command))
 
-    if await add_command.is_matching_command(event):
-        await add_command.handler(event)
-    elif await del_command.is_matching_command(event):
-        await del_command.handler(event)
-    elif await user_command.is_matching_command(event):
-        await user_command.handler(event)
+                bot.command(command_registry[command.name])
+                logging.info(command.name + " registered")
 
 
 bot.run()

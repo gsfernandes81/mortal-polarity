@@ -281,17 +281,18 @@ server = ["pynacl (>=1.5,<2.0)"]
 speedups = ["aiodns (>=3.0,<4.0)", "cchardet (>=2.1,<3.0)", "Brotli (>=1.0,<2.0)", "ciso8601 (>=2.2,<3.0)"]
 
 [[package]]
-name = "hikari-crescent"
-version = "0.1.0"
-description = "🌕 A dead simple command handler for Hikari"
+name = "hikari-lightbulb"
+version = "2.2.2"
+description = "A simple to use command handler for Hikari"
 category = "main"
 optional = false
-python-versions = ">=3.8,<3.11"
+python-versions = ">=3.8.0,<3.11"
 
 [package.dependencies]
-attrs = ">=21.4.0,<22.0.0"
-hikari = ">=2.0.0.dev108"
-pycooldown = ">=0.1.0-beta.6,<0.2.0"
+hikari = ">=2.0.0.dev108,<2.1.0"
+
+[package.extras]
+crontrigger = ["croniter (>=1.3.5,<1.4.0)", "types-croniter (>=1.0.10,<1.1.0)"]
 
 [[package]]
 name = "idna"
@@ -337,7 +338,7 @@ python-versions = ">=3.7"
 name = "mypy-extensions"
 version = "0.4.3"
 description = "Experimental type system extensions for programs checked with the mypy typechecker."
-category = "main"
+category = "dev"
 optional = false
 python-versions = "*"
 
@@ -425,17 +426,6 @@ cffi = ">=1.5.0"
 
 [package.extras]
 idna = ["idna (>=2.1)"]
-
-[[package]]
-name = "pycooldown"
-version = "0.1.0b8"
-description = "A lightning fast cooldown/ratelimit implementation."
-category = "main"
-optional = false
-python-versions = ">=3.8,<4.0"
-
-[package.dependencies]
-mypy-extensions = ">=0.4.3,<0.5.0"
 
 [[package]]
 name = "pycparser"
@@ -554,7 +544,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "~3.10.1"
-content-hash = "7ac545570be9a94676785a87088b11576ee87a068185fe5dfe554e1479e9ca49"
+content-hash = "7c09d81865bc00853244abebd18c35ccf93f61d08bac326267e45d90e289bf46"
 
 [metadata.files]
 aiodns = [
@@ -1008,9 +998,9 @@ hikari = [
     {file = "hikari-2.0.0.dev108-py3-none-any.whl", hash = "sha256:bc78e5c753f0b87ae24e1a644a2e4d01d08d5ed35cbaca0f160da5283a589785"},
     {file = "hikari-2.0.0.dev108.tar.gz", hash = "sha256:d13cfcd0e3732185fa3048b5d9fd8b6078b5dbb0df7820ba7e3e55083bf9d4b5"},
 ]
-hikari-crescent = [
-    {file = "hikari-crescent-0.1.0.tar.gz", hash = "sha256:e3147f5bcdf5df6bc2c774e5fdf47548066b5898f12c050157b88bc64d1cf02f"},
-    {file = "hikari_crescent-0.1.0-py3-none-any.whl", hash = "sha256:d0b5590b25af016ffa4ae941ed11748610d600f65be63a8ea63fd7c04c70cc9c"},
+hikari-lightbulb = [
+    {file = "hikari-lightbulb-2.2.2.tar.gz", hash = "sha256:73e67ad04d26a954ccbbff6d6371c34100a5e0cec15ea4b63cc051def8ade578"},
+    {file = "hikari_lightbulb-2.2.2-py3-none-any.whl", hash = "sha256:73809b81b9734443a05194acc649f4ba0ad58c5dec95f2611df48aa969bb09c7"},
 ]
 idna = [
     {file = "idna-3.3-py3-none-any.whl", hash = "sha256:84d9dd047ffa80596e0f246e2eab0b391788b0503584e8945f2368256d2735ff"},
@@ -1241,10 +1231,6 @@ pycares = [
     {file = "pycares-4.1.2-cp39-cp39-win32.whl", hash = "sha256:ed71dc4290d9c3353945965604ef1f6a4de631733e9819a7ebc747220b27e641"},
     {file = "pycares-4.1.2-cp39-cp39-win_amd64.whl", hash = "sha256:ec00f3594ee775665167b1a1630edceefb1b1283af9ac57480dba2fb6fd6c360"},
     {file = "pycares-4.1.2.tar.gz", hash = "sha256:03490be0e7b51a0c8073f877bec347eff31003f64f57d9518d419d9369452837"},
-]
-pycooldown = [
-    {file = "pycooldown-0.1.0b8-py3-none-any.whl", hash = "sha256:919de9eb625ec776b662eef427eba9c6d6e06dfcb16cc5eb1fcd4033c3afc105"},
-    {file = "pycooldown-0.1.0b8.tar.gz", hash = "sha256:3cf709ad63c15d88b4ede4a8314dced7b2fede6bc53cb97e4279dfb2e312cc4a"},
 ]
 pycparser = [
     {file = "pycparser-2.21-py2.py3-none-any.whl", hash = "sha256:8ee45429555515e1f6b185e78100aea234072576aa43ab53aefcae078162fca9"},
