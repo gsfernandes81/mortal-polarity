@@ -27,8 +27,13 @@ from .schemas import Commands
 db_engine = create_async_engine(cfg.db_url_async)
 db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
 
-COMMAND_GUILD_ID = cfg.test_env if cfg.test_env else hikari.UNDEFINED
-bot = lightbulb.BotApp(token=cfg.main_token, default_enabled_guilds=COMMAND_GUILD_ID)
+if cfg.test_env:
+    # Only use the test env for testing if it is specified
+    bot = lightbulb.BotApp(token=cfg.main_token, default_enabled_guilds=cfg.test_env)
+else:
+    # Test env isn't specified in production
+    bot = lightbulb.BotApp(token=cfg.main_token)
+
 command_registry = {}
 
 

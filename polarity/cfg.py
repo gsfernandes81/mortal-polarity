@@ -33,6 +33,7 @@ if db_url.startswith("postgres"):
 # Async SQLAlchemy DB Session KWArg Parameters
 db_session_kwargs = {"expire_on_commit": False, "class_": AsyncSession}
 
-test_env = int(_getenv("TEST_ENV")) if str(_getenv("TEST_ENV")) != "false" else False
+test_env = _getenv("TEST_ENV") or "false"
+test_env = int(test_env) if test_env != "false" else False
 
 admin_role = int(_getenv("ADMIN_ROLE"))
