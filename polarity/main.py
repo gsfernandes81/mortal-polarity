@@ -92,16 +92,15 @@ async def del_command(ctx: lightbulb.Context) -> None:
 
     async with db_session() as session:
         try:
-            command_registry.pop(name)
+            command_to_delte = command_registry.pop(name)
         except KeyError:
             await ctx.respond("No such command found")
             return
         async with session.begin():
             await session.execute(delete(Commands).where(Commands.name == name))
-
-    bot.remove_command(command_registry[name])
+            bot.remove_command(command_to_delte)
     await bot.sync_application_commands()
-    await ctx.respond("`{}`command deleted".format(name))
+    await ctx.respond("{} command deleted".format(name))
 
 
 async def user_command(ctx: lightbulb.Context):
