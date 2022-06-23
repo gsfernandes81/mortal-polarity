@@ -14,7 +14,9 @@
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
 import logging
+import re
 
+import aiohttp
 import hikari
 import lightbulb
 import uvloop
@@ -24,6 +26,11 @@ from sqlalchemy.sql.expression import delete, select
 
 from . import cfg
 from .schemas import Commands
+
+url_regex = re.compile(
+    "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+)
+
 
 db_engine = create_async_engine(cfg.db_url_async)
 db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
@@ -116,10 +123,27 @@ async def user_command(ctx: lightbulb.Context):
         async with session.begin():
             command = (
                 await session.execute(
-                    select(Commands.text).where(Commands.name == ctx.command.name)
+                    select(Commands).where(Commands.name == ctx.command.name)
                 )
             ).fetchone()[0]
-    await ctx.respond(command)
+    text = command.text.strip()
+    # Follow the redirects, check the extension, download only if it is a jgp
+    # Above to be implemented
+    links = url_regex.findall(text)
+    redirected_links = []
+    redirected_text = url_regex.sub("{}", text)
+    async with aiohttp.ClientSession() as session:
+        for link in links:
+            async with session.get(link) as response:
+                redirected_links.append(response.url)
+                logging.info(
+                    "Replacing link: {} with redirect: {}".format(
+                        link, redirected_links[-1]
+                    )
+                )
+    redirected_text = redirected_text.format(*redirected_links)
+
+    await ctx.respond(redirected_text)
 
 
 @bot.listen(hikari.StartingEvent)
