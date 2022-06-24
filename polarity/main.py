@@ -44,19 +44,20 @@ else:
     # Test env isn't specified in production
     bot = lightbulb.BotApp(token=cfg.main_token)
 
+controller = lightbulb.Plugin(
+    "controller", default_enabled_guilds=cfg.kyber_discord_server_id
+)
+controller.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
 command_registry = {}
 
 
-@bot.command
-@lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
+@controller.command
 @lightbulb.option("link", "Link to post when this command is used", type=str)
 @lightbulb.option(
     "description", "Description of what the command posts or does", type=str
 )
 @lightbulb.option("name", "Name of the command to add", type=str)
-@lightbulb.command(
-    "add", "Add a link to the bot, only usable by Kyber et al", auto_defer=True
-)
+@lightbulb.command("add", "Add a link to the bot", auto_defer=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def add_command(ctx: lightbulb.Context) -> None:
     name = ctx.options.name.lower()
@@ -80,7 +81,6 @@ async def add_command(ctx: lightbulb.Context) -> None:
                 description,
                 text,
             )
-            print(name, description, text)
             session.add(command)
 
             command_registry[command.name] = lightbulb.command(
@@ -93,12 +93,11 @@ async def add_command(ctx: lightbulb.Context) -> None:
     await ctx.respond("Command added")
 
 
-@bot.command
-@lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
+@controller.command
 @lightbulb.option("name", "Name of the command to delete", type=str)
 @lightbulb.command(
     "delete",
-    "Delete a command from the bot, only usable by Kyber et al",
+    "Delete a command from the bot",
     auto_defer=True,
 )
 @lightbulb.implements(lightbulb.SlashCommand)
@@ -180,4 +179,5 @@ async def on_error(event: lightbulb.CommandErrorEvent):
         raise event.exception.__cause__ or event.exception
 
 
+bot.add_plugin(controller)
 bot.run()

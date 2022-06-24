@@ -37,3 +37,5 @@ test_env = _getenv("TEST_ENV") or "false"
 test_env = int(test_env) if test_env != "false" else False
 
 admin_role = int(_getenv("ADMIN_ROLE"))
+
+kyber_discord_server_id = int(_getenv("KYBER_DISCORD_SERVER_ID"))
