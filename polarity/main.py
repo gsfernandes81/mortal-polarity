@@ -88,13 +88,31 @@ async def add_command(ctx: lightbulb.Context) -> None:
             )(lightbulb.implements(lightbulb.SlashCommand)(user_command))
             bot.command(command_registry[command.name])
             logging.info(command.name + " command registered")
-            await bot.sync_application_commands()
+            bot.event_manager.dispatch(RefreshCmdList())
 
     await ctx.respond("Command added")
 
 
+class RefreshCmdList(hikari.Event):
+    def __init__(self, sync: bool = True):
+        super().__init__()
+        # Whether to run the sync_application_commands method of the app
+        self.sync = sync
+
+    def app(self):
+        return bot
+
+
 @controller.command
-@lightbulb.option("name", "Name of the command to delete", type=str)
+@lightbulb.option(
+    "name",
+    "Name of the command to delete",
+    type=str,
+    # Note: This does not work at the start since command_registry
+    # isn't populated until the bot starts
+    # This is left in in case we modify command_registry in the future
+    choices=[cmd for cmd in command_registry.keys()],
+)
 @lightbulb.command(
     "delete",
     "Delete a command from the bot",
@@ -109,12 +127,20 @@ async def del_command(ctx: lightbulb.Context) -> None:
             command_to_delete = command_registry.pop(name)
         except KeyError:
             await ctx.respond("No such command found")
-            return
-        async with session.begin():
-            await session.execute(delete(Commands).where(Commands.name == name))
-            bot.remove_command(command_to_delete)
-    await bot.sync_application_commands()
-    await ctx.respond("{} command deleted".format(name))
+        else:
+            async with session.begin():
+                await session.execute(delete(Commands).where(Commands.name == name))
+                bot.remove_command(command_to_delete)
+                await ctx.respond("{} command deleted".format(name))
+    # Trigger a refresh of the choices in the delete command
+    bot.event_manager.dispatch(RefreshCmdList())
+
+
+@bot.listen(RefreshCmdList)
+async def del_command_updater(event: RefreshCmdList):
+    del_command.options.get("name").choices = [cmd for cmd in command_registry.keys()]
+    if event.sync:
+        await bot.sync_application_commands()
 
 
 async def user_command(ctx: lightbulb.Context):
@@ -162,6 +188,11 @@ async def register_commands_on_startup(event: hikari.StartingEvent):
 
                 bot.command(command_registry[command.name])
                 logging.info(command.name + " registered")
+
+    # Trigger a refresh of the options in the delete command
+    # Don't sync since the bot has not started yet and
+    # Will sync on its own for startup
+    bot.event_manager.dispatch(RefreshCmdList(sync=False))
 
 
 @bot.listen(lightbulb.CommandErrorEvent)
