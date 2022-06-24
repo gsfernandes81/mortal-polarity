@@ -136,9 +136,64 @@ async def del_command(ctx: lightbulb.Context) -> None:
     bot.event_manager.dispatch(RefreshCmdList())
 
 
+@controller.command
+@lightbulb.option(
+    "description",
+    "Description of the command to edit",
+    type=str,
+    default="",
+)
+@lightbulb.option(
+    "link", "Replace the link field in the command with this", type=str, default=""
+)
+@lightbulb.option(
+    "name",
+    "Name of the command to edit",
+    type=str,
+    # Note: This does not work at the start since command_registry
+    # isn't populated until the bot starts
+    # This is left in in case we modify command_registry in the future
+    choices=[cmd for cmd in command_registry.keys()],
+)
+@lightbulb.command(
+    "edit",
+    "Edit a command",
+    auto_defer=True,
+)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def edit_cmd(ctx: lightbulb.Context):
+    async with db_session() as session:
+        async with session.begin():
+            command: Commands = (
+                await session.execute(
+                    select(Commands).where(Commands.name == ctx.options.name.lower())
+                )
+            ).fetchone()[0]
+
+        if ctx.options.link is None and ctx.options.description is None:
+            await ctx.respond(
+                "The description for this command is currently: {}\n".format(
+                    command.description
+                )
+                + "The link for this command is currently: {}".format(command.text)
+            )
+        else:
+            if ctx.options.link not in [None, ""]:
+                async with session.begin():
+                    command.text = ctx.options.link
+                    session.add(command)
+            if ctx.options.description not in [None, ""]:
+                async with session.begin():
+                    command.description = ctx.options.description
+                    session.add(command)
+            await ctx.respond("Command updated")
+
+
 @bot.listen(RefreshCmdList)
-async def del_command_updater(event: RefreshCmdList):
-    del_command.options.get("name").choices = [cmd for cmd in command_registry.keys()]
+async def command_options_updater(event: RefreshCmdList):
+    choices = [cmd for cmd in command_registry.keys()]
+    del_command.options.get("name").choices = choices
+    edit_cmd.options.get("name").choices = choices
     if event.sync:
         await bot.sync_application_commands()
 
