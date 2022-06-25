@@ -15,15 +15,16 @@
 
 import logging
 
+import aiohttp
 import hikari
 import lightbulb
 import uvloop
+from sector_accounting import Rotation
 from sqlalchemy.sql.expression import delete, select
 
 from . import cfg
 from .schemas import Commands
 from .utils import RefreshCmdListEvent, db_command_to_lb_user_command, db_session
-
 
 uvloop.install()
 command_registry = {}
@@ -217,6 +218,20 @@ async def edit_command(ctx: lightbulb.Context):
                 RefreshCmdListEvent(bot).dispatch()
 
             await ctx.respond("Command updated")
+
+
+@bot.command
+@lightbulb.command("lstoday", "Find out about today's lost sector", auto_defer=True)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def ls_command(ctx: lightbulb.Context):
+    ls_gfx_url = Rotation.from_gspread_url(
+        cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=1
+    )().shortlink_gfx
+    async with aiohttp.ClientSession() as session:
+        async with session.get(ls_gfx_url) as response:
+            ls_gfx_url = str(response.url)
+
+    await ctx.respond(ls_gfx_url)
 
 
 @bot.listen(RefreshCmdListEvent)

@@ -6,7 +6,7 @@ authors = ["GS <gsfernandes81@gmail.com>"]
 license = "GNU AGPL-3.0-or-later"
 
 [tool.poetry.dependencies]
-python = "~3.10.1"
+python = "~3.10.5"
 postgres = "*"
 psycopg2-binary = "*"
 psycopg2-pool = "*"
@@ -17,6 +17,8 @@ SQLAlchemy = "^1.4.35"
 hikari = { extras = ["speedups"], version = "^2.0.0-alpha.108" }
 hikari-lightbulb = "^2.2.2"
 uvloop = "^0.16.0"
+sector_accounting = { git = "ssh://git@github.com/gs729/sector_accounting.git", rev = "b6059f4" }
+requests = "^2.28.0"
 
 [tool.poetry.dev-dependencies]
 pyflakes = "*"
