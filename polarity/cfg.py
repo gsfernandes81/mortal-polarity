@@ -39,3 +39,10 @@ test_env = int(test_env) if test_env != "false" else False
 admin_role = int(_getenv("ADMIN_ROLE"))
 
 kyber_discord_server_id = int(_getenv("KYBER_DISCORD_SERVER_ID"))
+
+lightbulb_params = (
+    # Only use the test env for testing if it is specified
+    {"token": main_token, "default_enabled_guilds": test_env}
+    if test_env
+    else {"token": main_token}  # Test env isn't specified in production
+)

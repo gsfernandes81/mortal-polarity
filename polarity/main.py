@@ -14,39 +14,20 @@
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
 import logging
-import re
 
-import aiohttp
 import hikari
 import lightbulb
 import uvloop
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql.expression import delete, select
 
 from . import cfg
 from .schemas import Commands
+from .utils import RefreshCmdListEvent, db_command_to_lb_user_command, db_session
 
-url_regex = re.compile(
-    "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
-)
-
-
-db_engine = create_async_engine(cfg.db_url_async)
-db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
 
 uvloop.install()
-
-if cfg.test_env:
-    # Only use the test env for testing if it is specified
-    bot: lightbulb.BotApp = lightbulb.BotApp(
-        token=cfg.main_token, default_enabled_guilds=cfg.test_env
-    )
-else:
-    # Test env isn't specified in production
-    bot: lightbulb.BotApp = lightbulb.BotApp(token=cfg.main_token)
-
 command_registry = {}
+bot: lightbulb.BotApp = lightbulb.BotApp(**cfg.lightbulb_params)
 
 
 @bot.command
@@ -87,24 +68,12 @@ async def add_command(ctx: lightbulb.Context) -> None:
             )
             session.add(command)
 
-            command_registry[command.name] = lightbulb.command(
-                command.name, command.description, auto_defer=True
-            )(lightbulb.implements(lightbulb.SlashCommand)(user_command))
+            command_registry[command.name] = db_command_to_lb_user_command(command)
             bot.command(command_registry[command.name])
             logging.info(command.name + " command registered")
-            bot.event_manager.dispatch(RefreshCmdList())
+            RefreshCmdListEvent(bot).dispatch()
 
     await ctx.respond("Command added")
-
-
-class RefreshCmdList(hikari.Event):
-    def __init__(self, sync: bool = True):
-        super().__init__()
-        # Whether to run the sync_application_commands method of the app
-        self.sync = sync
-
-    def app(self):
-        return bot
 
 
 @bot.command
@@ -139,7 +108,7 @@ async def del_command(ctx: lightbulb.Context) -> None:
                 bot.remove_command(command_to_delete)
                 await ctx.respond("{} command deleted".format(name))
     # Trigger a refresh of the choices in the delete command
-    bot.event_manager.dispatch(RefreshCmdList())
+    RefreshCmdListEvent(bot).dispatch()
 
 
 @bot.command
@@ -178,7 +147,7 @@ async def del_command(ctx: lightbulb.Context) -> None:
     guilds=(cfg.kyber_discord_server_id,),
 )
 @lightbulb.implements(lightbulb.SlashCommand)
-async def edit_cmd(ctx: lightbulb.Context):
+async def edit_command(ctx: lightbulb.Context):
     async with db_session() as session:
         async with session.begin():
             command: Commands = (
@@ -215,7 +184,7 @@ async def edit_cmd(ctx: lightbulb.Context):
                     # Remove and unregister the old command
                     bot.remove_command(command_registry.pop(old_name))
                     # Register new command with bot and registry dict
-                    command_registry[new_name] = _db_command_to_lb_user_command(command)
+                    command_registry[new_name] = db_command_to_lb_user_command(command)
                     bot.command(command_registry[new_name])
             if ctx.options.new_response not in [None, ""]:
                 async with session.begin():
@@ -231,7 +200,7 @@ async def edit_cmd(ctx: lightbulb.Context):
                     # ).description = command.description
                     # Need to delete and readd the command instead
                     bot.remove_command(command_registry.pop(command.name))
-                    command_registry[command.name] = _db_command_to_lb_user_command(
+                    command_registry[command.name] = db_command_to_lb_user_command(
                         command
                     )
                     bot.command(command_registry[command.name])
@@ -245,53 +214,18 @@ async def edit_cmd(ctx: lightbulb.Context):
             ]:
                 # If either the description or name of a command is changed
                 # we will need to have discord update its commands server side
-                bot.event_manager.dispatch(RefreshCmdList())
+                RefreshCmdListEvent(bot).dispatch()
 
             await ctx.respond("Command updated")
 
 
-@bot.listen(RefreshCmdList)
-async def command_options_updater(event: RefreshCmdList):
+@bot.listen(RefreshCmdListEvent)
+async def command_options_updater(event: RefreshCmdListEvent):
     choices = [cmd for cmd in command_registry.keys()]
     del_command.options.get("name").choices = choices
-    edit_cmd.options.get("name").choices = choices
+    edit_command.options.get("name").choices = choices
     if event.sync:
         await bot.sync_application_commands()
-
-
-async def user_command(ctx: lightbulb.Context):
-    async with db_session() as session:
-        async with session.begin():
-            command = (
-                await session.execute(
-                    select(Commands).where(Commands.name == ctx.command.name)
-                )
-            ).fetchone()[0]
-    text = command.response.strip()
-    # Follow the redirects, check the extension, download only if it is a jgp
-    # Above to be implemented
-    links = url_regex.findall(text)
-    redirected_links = []
-    redirected_text = url_regex.sub("{}", text)
-    async with aiohttp.ClientSession() as session:
-        for link in links:
-            async with session.get(link) as response:
-                redirected_links.append(response.url)
-                logging.debug(
-                    "Replacing link: {} with redirect: {}".format(
-                        link, redirected_links[-1]
-                    )
-                )
-    redirected_text = redirected_text.format(*redirected_links)
-
-    await ctx.respond(redirected_text)
-
-
-def _db_command_to_lb_user_command(command: Commands):
-    # Needs an open db session watching command
-    return lightbulb.command(command.name, command.description, auto_defer=True)(
-        lightbulb.implements(lightbulb.SlashCommand)(user_command)
-    )
 
 
 @bot.listen(hikari.StartingEvent)
@@ -304,14 +238,14 @@ async def register_commands_on_startup(event: hikari.StartingEvent):
             command_list = [] if command_list is None else command_list
             command_list = [command[0] for command in command_list]
             for command in command_list:
-                command_registry[command.name] = _db_command_to_lb_user_command(command)
+                command_registry[command.name] = db_command_to_lb_user_command(command)
                 bot.command(command_registry[command.name])
                 logging.info(command.name + " registered")
 
     # Trigger a refresh of the options in the delete command
     # Don't sync since the bot has not started yet and
     # Will sync on its own for startup
-    bot.event_manager.dispatch(RefreshCmdList(sync=False))
+    RefreshCmdListEvent(bot, sync=False).dispatch()
 
 
 @bot.listen(lightbulb.CommandErrorEvent)
