@@ -668,7 +668,7 @@ pytz = "*"
 
 [package.source]
 type = "git"
-url = "ssh://git@github.com/gs729/sector_accounting.git"
+url = "https://github.com/gs729/sector_accounting.git"
 reference = "b6059f4"
 resolved_reference = "b6059f4367331e227dea8382daf154cff835b0ef"
 
@@ -788,7 +788,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "~3.10.5"
-content-hash = "202d8077a9dee64f1b158086fb6694b77f8670def436b21603861883da96bd14"
+content-hash = "e3173bc64504ffd9205da47cc4237a1e238bcb2cdaead5d67d706db60d8d16bf"
 
 [metadata.files]
 aiodns = [
