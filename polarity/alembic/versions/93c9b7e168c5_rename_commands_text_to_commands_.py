@@ -13,22 +13,27 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.sql.schema import Column
-from sqlalchemy.sql.sqltypes import String
+"""Rename commands.text to commands.response
 
-Base = declarative_base()
+Revision ID: 93c9b7e168c5
+Revises: 5314339d0745
+Create Date: 2022-06-25 13:42:11.034486
+
+"""
+from alembic import op
+import sqlalchemy as sa
 
 
-class Commands(Base):
-    __tablename__ = "commands"
-    __mapper_args__ = {"eager_defaults": True}
-    name = Column("name", String, primary_key=True)
-    description = Column("description", String)
-    response = Column("response", String)
+# revision identifiers, used by Alembic.
+revision = "93c9b7e168c5"
+down_revision = "5314339d0745"
+branch_labels = None
+depends_on = None
 
-    def __init__(self, name, description, response):
-        super().__init__()
-        self.name = name
-        self.description = description
-        self.response = response
+
+def upgrade() -> None:
+    op.alter_column("commands", "text", nullable=False, new_column_name="response")
+
+
+def downgrade() -> None:
+    op.alter_column("commands", "response", nullable=False, new_column_name="text")

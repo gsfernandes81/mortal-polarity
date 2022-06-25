@@ -52,17 +52,17 @@ command_registry = {}
 
 
 @controller.command
-@lightbulb.option("link", "Link to post when this command is used", type=str)
+@lightbulb.option("response", "Response to post when this command is used", type=str)
 @lightbulb.option(
     "description", "Description of what the command posts or does", type=str
 )
 @lightbulb.option("name", "Name of the command to add", type=str)
-@lightbulb.command("add", "Add a link to the bot", auto_defer=True)
+@lightbulb.command("add", "Add a command to the bot", auto_defer=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def add_command(ctx: lightbulb.Context) -> None:
     name = ctx.options.name.lower()
     description = ctx.options.description
-    text = ctx.options.link
+    text = ctx.options.response
 
     async with db_session() as session:
         async with session.begin():
@@ -144,7 +144,10 @@ async def del_command(ctx: lightbulb.Context) -> None:
     default="",
 )
 @lightbulb.option(
-    "link", "Replace the link field in the command with this", type=str, default=""
+    "response",
+    "Replace the response field in the command with this",
+    type=str,
+    default="",
 )
 @lightbulb.option(
     "name",
@@ -170,22 +173,26 @@ async def edit_cmd(ctx: lightbulb.Context):
                 )
             ).fetchone()[0]
 
-        if ctx.options.link is None and ctx.options.description is None:
+        if ctx.options.response is None and ctx.options.description is None:
             await ctx.respond(
                 "The description for this command is currently: {}\n".format(
                     command.description
                 )
-                + "The link for this command is currently: {}".format(command.text)
+                + "The response for this command is currently: {}".format(
+                    command.response
+                )
             )
         else:
-            if ctx.options.link not in [None, ""]:
+            if ctx.options.response not in [None, ""]:
                 async with session.begin():
-                    command.text = ctx.options.link
+                    command.response = ctx.options.response
                     session.add(command)
             if ctx.options.description not in [None, ""]:
                 async with session.begin():
                     command.description = ctx.options.description
                     session.add(command)
+                    bot.event_manager.dispatch(RefreshCmdList())
+
             await ctx.respond("Command updated")
 
 
@@ -206,7 +213,7 @@ async def user_command(ctx: lightbulb.Context):
                     select(Commands).where(Commands.name == ctx.command.name)
                 )
             ).fetchone()[0]
-    text = command.text.strip()
+    text = command.response.strip()
     # Follow the redirects, check the extension, download only if it is a jgp
     # Above to be implemented
     links = url_regex.findall(text)
@@ -216,7 +223,7 @@ async def user_command(ctx: lightbulb.Context):
         for link in links:
             async with session.get(link) as response:
                 redirected_links.append(response.url)
-                logging.info(
+                logging.debug(
                     "Replacing link: {} with redirect: {}".format(
                         link, redirected_links[-1]
                     )
