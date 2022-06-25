@@ -39,25 +39,29 @@ uvloop.install()
 
 if cfg.test_env:
     # Only use the test env for testing if it is specified
-    bot = lightbulb.BotApp(token=cfg.main_token, default_enabled_guilds=cfg.test_env)
+    bot: lightbulb.BotApp = lightbulb.BotApp(
+        token=cfg.main_token, default_enabled_guilds=cfg.test_env
+    )
 else:
     # Test env isn't specified in production
-    bot = lightbulb.BotApp(token=cfg.main_token)
+    bot: lightbulb.BotApp = lightbulb.BotApp(token=cfg.main_token)
 
-controller = lightbulb.Plugin(
-    "controller", default_enabled_guilds=cfg.kyber_discord_server_id
-)
-controller.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
 command_registry = {}
 
 
-@controller.command
+@bot.command
+@lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
 @lightbulb.option("response", "Response to post when this command is used", type=str)
 @lightbulb.option(
     "description", "Description of what the command posts or does", type=str
 )
 @lightbulb.option("name", "Name of the command to add", type=str)
-@lightbulb.command("add", "Add a command to the bot", auto_defer=True)
+@lightbulb.command(
+    "add",
+    "Add a command to the bot",
+    auto_defer=True,
+    guilds=(cfg.kyber_discord_server_id,),
+)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def add_command(ctx: lightbulb.Context) -> None:
     name = ctx.options.name.lower()
@@ -103,7 +107,8 @@ class RefreshCmdList(hikari.Event):
         return bot
 
 
-@controller.command
+@bot.command
+@lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
 @lightbulb.option(
     "name",
     "Name of the command to delete",
@@ -117,6 +122,7 @@ class RefreshCmdList(hikari.Event):
     "delete",
     "Delete a command from the bot",
     auto_defer=True,
+    guilds=(cfg.kyber_discord_server_id,),
 )
 @lightbulb.implements(lightbulb.SlashCommand)
 async def del_command(ctx: lightbulb.Context) -> None:
@@ -136,16 +142,23 @@ async def del_command(ctx: lightbulb.Context) -> None:
     bot.event_manager.dispatch(RefreshCmdList())
 
 
-@controller.command
+@bot.command
+@lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
 @lightbulb.option(
-    "description",
+    "new_description",
     "Description of the command to edit",
     type=str,
     default="",
 )
 @lightbulb.option(
-    "response",
+    "new_response",
     "Replace the response field in the command with this",
+    type=str,
+    default="",
+)
+@lightbulb.option(
+    "new_name",
+    "Replace the name of the command with this",
     type=str,
     default="",
 )
@@ -162,6 +175,7 @@ async def del_command(ctx: lightbulb.Context) -> None:
     "edit",
     "Edit a command",
     auto_defer=True,
+    guilds=(cfg.kyber_discord_server_id,),
 )
 @lightbulb.implements(lightbulb.SlashCommand)
 async def edit_cmd(ctx: lightbulb.Context):
@@ -173,9 +187,14 @@ async def edit_cmd(ctx: lightbulb.Context):
                 )
             ).fetchone()[0]
 
-        if ctx.options.response is None and ctx.options.description is None:
+        if (
+            ctx.options.new_name is None
+            and ctx.options.new_response is None
+            and ctx.options.new_description is None
+        ):
             await ctx.respond(
-                "The description for this command is currently: {}\n".format(
+                "The name for this command is currently: {}\n".format(command.name)
+                + "The description for this command is currently: {}\n".format(
                     command.description
                 )
                 + "The response for this command is currently: {}".format(
@@ -183,15 +202,50 @@ async def edit_cmd(ctx: lightbulb.Context):
                 )
             )
         else:
-            if ctx.options.response not in [None, ""]:
+            if ctx.options.new_name not in [None, ""]:
                 async with session.begin():
-                    command.response = ctx.options.response
+                    old_name = command.name
+                    new_name = ctx.options.new_name.lower()
+                    command.name = new_name
                     session.add(command)
-            if ctx.options.description not in [None, ""]:
+                    # Lightbulb doesn't like changing this:
+                    # bot.get_slash_command(ctx.options.name).name = command.name
+                    # Need to delete and readd the command instead
+                    # -x-x-x-x-
+                    # Remove and unregister the old command
+                    bot.remove_command(command_registry.pop(old_name))
+                    # Register new command with bot and registry dict
+                    command_registry[new_name] = _db_command_to_lb_user_command(command)
+                    bot.command(command_registry[new_name])
+            if ctx.options.new_response not in [None, ""]:
                 async with session.begin():
-                    command.description = ctx.options.description
+                    command.response = ctx.options.new_response
                     session.add(command)
-                    bot.event_manager.dispatch(RefreshCmdList())
+            if ctx.options.new_description not in [None, ""]:
+                async with session.begin():
+                    command.description = ctx.options.new_description
+                    session.add(command)
+                    # Lightbulb doesn't like changing this:
+                    # bot.get_slash_command(
+                    #     ctx.options.name
+                    # ).description = command.description
+                    # Need to delete and readd the command instead
+                    bot.remove_command(command_registry.pop(command.name))
+                    command_registry[command.name] = _db_command_to_lb_user_command(
+                        command
+                    )
+                    bot.command(command_registry[command.name])
+
+            if ctx.options.new_description not in [
+                None,
+                "",
+            ] or ctx.options.new_name not in [
+                None,
+                "",
+            ]:
+                # If either the description or name of a command is changed
+                # we will need to have discord update its commands server side
+                bot.event_manager.dispatch(RefreshCmdList())
 
             await ctx.respond("Command updated")
 
@@ -233,6 +287,13 @@ async def user_command(ctx: lightbulb.Context):
     await ctx.respond(redirected_text)
 
 
+def _db_command_to_lb_user_command(command: Commands):
+    # Needs an open db session watching command
+    return lightbulb.command(command.name, command.description, auto_defer=True)(
+        lightbulb.implements(lightbulb.SlashCommand)(user_command)
+    )
+
+
 @bot.listen(hikari.StartingEvent)
 async def register_commands_on_startup(event: hikari.StartingEvent):
     """Register additional text commands from db."""
@@ -243,11 +304,7 @@ async def register_commands_on_startup(event: hikari.StartingEvent):
             command_list = [] if command_list is None else command_list
             command_list = [command[0] for command in command_list]
             for command in command_list:
-
-                command_registry[command.name] = lightbulb.command(
-                    command.name, command.description, auto_defer=True
-                )(lightbulb.implements(lightbulb.SlashCommand)(user_command))
-
+                command_registry[command.name] = _db_command_to_lb_user_command(command)
                 bot.command(command_registry[command.name])
                 logging.info(command.name + " registered")
 
@@ -272,5 +329,4 @@ async def on_error(event: lightbulb.CommandErrorEvent):
         raise event.exception.__cause__ or event.exception
 
 
-bot.add_plugin(controller)
 bot.run()
