@@ -14,20 +14,15 @@
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
 import logging
+
 import hikari
 import lightbulb
-from hypercorn.asyncio import serve
-from hypercorn.config import Config
-import quart
-from quart import request, jsonify
-import asyncio
+from aiohttp import web
 
 from . import cfg
 
-config = Config()
-config.bind = ["0.0.0.0:{}".format(cfg.port)]
-app = quart.Quart(__name__)
 
+app = web.Application()
 
 # Event that dispatches itself when a destiny 2 daily reset occurs.
 # When a destiny 2 reset occurs, the reset_signaller.py process
@@ -47,31 +42,31 @@ class ResetSignal(hikari.Event):
     def fire(self) -> None:
         self.bot.event_manager.dispatch(self)
 
-    def remote_fire(self) -> quart.Response:
-        if str(request.remote_addr) == ("127.0.0.1"):
+    async def remote_fire(self, request: web.Request) -> web.Response:
+        if str(request.remote) == "127.0.0.1":
             logging.info(
                 "{self.qualifier} reset signal received and passed on".format(self=self)
             )
             self.fire()
-            return jsonify(success=True)
+            return web.Response(status=200)
         else:
             logging.warning(
                 "{self.qualifier} reset signal received from non-local source, ignoring".format(
                     self=self
                 )
             )
-            return jsonify(success=False)
+            return web.Response(status=401)
 
     def arm(self) -> None:
         # Run the hypercorn server to wait for the signal
         # This method is non-blocking
-        app.add_url_rule(
-            "/{self.qualifier}-reset-signal".format(self=self),
-            methods=[
-                "POST",
-            ],
-            view_func=self.remote_fire,
-            endpoint="{self.qualifier}-reset-signal".format(self=self),
+        app.add_routes(
+            [
+                web.post(
+                    "/{self.qualifier}-reset-signal".format(self=self),
+                    self.remote_fire,
+                ),
+            ]
         )
 
 
@@ -86,9 +81,7 @@ class WeeklyResetSignal(ResetSignal):
 async def arm(bot) -> None:
     DailyResetSignal(bot).arm()
     WeeklyResetSignal(bot).arm()
-    asyncio.create_task(
-        serve(
-            app,
-            config,
-        )
-    )
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "localhost", cfg.port)
+    await site.start()
