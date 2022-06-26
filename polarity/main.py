@@ -13,12 +13,15 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
+import datetime as dt
 import logging
+from calendar import month_name as month
 
 import aiohttp
 import hikari
 import lightbulb
 import uvloop
+from pytz import utc
 from sector_accounting import Rotation
 from sqlalchemy.sql.expression import delete, select
 
@@ -224,14 +227,36 @@ async def edit_command(ctx: lightbulb.Context):
 @lightbulb.command("lstoday", "Find out about today's lost sector", auto_defer=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def ls_command(ctx: lightbulb.Context):
-    ls_gfx_url = Rotation.from_gspread_url(
-        cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=1
-    )().shortlink_gfx
+    buffer = 1  # Minute
+    discord_ls_post_string = (
+        "**Daily Lost Sector for {month} {day}**\n"
+        + "\n"
+        + "<:LS:849727805994565662> **{sector.name}**:\n"
+        + "• Exotic Reward (If Solo): {sector.reward}\n"
+        + "• Champs: {sector.champions}\n"
+        + "• Shields: {sector.shields}\n"
+        + "• Burn: {sector.burn}\n"
+        + "• Modifiers: {sector.modifiers}\n"
+        + "\n"
+        + "**More Info:** <https://kyber3000.com/LS>"
+        + "[ ]({ls_url})"
+    )
+
+    date = dt.datetime.now(tz=utc) - dt.timedelta(hours=16, minutes=60 - buffer)
+    rot = Rotation.from_gspread_url(
+        cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=buffer
+    )()
+
+    # Follow the hyperlink to have the newest image embedded
     async with aiohttp.ClientSession() as session:
-        async with session.get(ls_gfx_url) as response:
+        async with session.get(rot.shortlink_gfx) as response:
             ls_gfx_url = str(response.url)
 
-    await ctx.respond(ls_gfx_url)
+    await ctx.respond(
+        discord_ls_post_string.format(
+            month=month[date.month], day=date.day, sector=rot, ls_url=ls_gfx_url
+        )
+    )
 
 
 @bot.listen(RefreshCmdListEvent)
