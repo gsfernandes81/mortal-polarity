@@ -14,7 +14,7 @@ asyncpg = "*"
 aiofiles = "*"
 alembic = "*"
 SQLAlchemy = "^1.4.35"
-hikari = { extras = ["speedups"], version = "^2.0.0-alpha.108" }
+hikari = { extras = ["speedups"], version = "^2.0.0-alpha.109" }
 hikari-lightbulb = "^2.2.2"
 uvloop = "^0.16.0"
 sector_accounting = { git = "https://github.com/gs729/sector_accounting.git", rev = "b6059f4" }

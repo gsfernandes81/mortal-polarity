@@ -25,12 +25,33 @@ import lightbulb
 from pytz import utc
 from sector_accounting import Rotation
 from sqlalchemy.sql.expression import delete, select
+from sqlalchemy.sql.schema import Column
+from sqlalchemy.sql.sqltypes import String
 
 from . import cfg
-from .schemas import Commands
-from .utils import RefreshCmdListEvent, db_command_to_lb_user_command, db_session
+from .utils import (
+    Base,
+    RefreshCmdListEvent,
+    db_command_to_lb_user_command,
+    db_session,
+    url_regex,
+)
 
 command_registry = {}
+
+
+class Commands(Base):
+    __tablename__ = "commands"
+    __mapper_args__ = {"eager_defaults": True}
+    name = Column("name", String, primary_key=True)
+    description = Column("description", String)
+    response = Column("response", String)
+
+    def __init__(self, name, description, response):
+        super().__init__()
+        self.name = name
+        self.description = description
+        self.response = response
 
 
 @lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
@@ -309,3 +330,38 @@ def register_all(bot: lightbulb.BotApp):
         (lightbulb.CommandErrorEvent, on_error),
     ]:
         bot.listen(event)(handler)
+
+
+async def user_command(ctx: lightbulb.Context):
+    async with db_session() as session:
+        async with session.begin():
+            command = (
+                await session.execute(
+                    select(Commands).where(Commands.name == ctx.command.name)
+                )
+            ).fetchone()[0]
+    text = command.response.strip()
+    # Follow the redirects, check the extension, download only if it is a jgp
+    # Above to be implemented
+    links = url_regex.findall(text)
+    redirected_links = []
+    redirected_text = url_regex.sub("{}", text)
+    async with aiohttp.ClientSession() as session:
+        for link in links:
+            async with session.get(link) as response:
+                redirected_links.append(str(response.url))
+                logging.debug(
+                    "Replacing link: {} with redirect: {}".format(
+                        link, redirected_links[-1]
+                    )
+                )
+    redirected_text = redirected_text.format(*redirected_links)
+
+    await ctx.respond(redirected_text)
+
+
+def db_command_to_lb_user_command(command: Commands):
+    # Needs an open db session watching command
+    return lightbulb.command(command.name, command.description, auto_defer=True)(
+        lightbulb.implements(lightbulb.SlashCommand)(user_command)
+    )
