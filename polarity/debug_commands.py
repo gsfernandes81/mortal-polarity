@@ -13,26 +13,21 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio
-import hikari
 import lightbulb
-import uvloop
 
-from . import cfg, user_commands, debug_commands
-from .utils import Base
-from .autoannounce import arm
-
-uvloop.install()
-bot: lightbulb.BotApp = lightbulb.BotApp(**cfg.lightbulb_params)
+from . import autoannounce, cfg
 
 
-@bot.listen(hikari.StartedEvent)
-async def on_ready(event: hikari.StartedEvent) -> None:
-    await arm(bot)
+@lightbulb.command(
+    name="trigger_daily_reset",
+    description="Sends a daily reset signal",
+    guilds=(cfg.test_env,),
+)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def daily_reset(ctx: lightbulb.Context) -> None:
+    ctx.bot.dispatch(autoannounce.DailyResetSignal(ctx.bot))
+    await ctx.respond("Daily reset signal sent")
 
 
-if __name__ == "__main__":
-    user_commands.register_all(bot)
-    if cfg.test_env:
-        debug_commands.register_all(bot)
-    bot.run()
+def register_all(bot: lightbulb.BotApp) -> None:
+    bot.command(daily_reset)
