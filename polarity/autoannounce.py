@@ -22,6 +22,7 @@ from sqlalchemy import Boolean, Integer
 from sqlalchemy.sql.schema import Column
 from . import cfg
 from .utils import Base as db_base_class, _create_or_get
+from .user_commands import get_lost_sector_text
 
 app = web.Application()
 
@@ -124,9 +125,7 @@ async def lost_sector_announcer(event: LostSectorSignal):
         # Can add hikari.GuildNewsChannel for announcement channel support
         # could be useful if we automate more stuff for Kyber
         if isinstance(channel, hikari.GuildTextChannel):
-            await channel.send(
-                "Lost sector! Please check the website for more information."
-            )
+            await channel.send(embed=await get_lost_sector_text())
 
 
 def _wire_listeners(bot: lightbulb.BotApp) -> None:
