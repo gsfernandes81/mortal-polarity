@@ -44,3 +44,13 @@ class RefreshCmdListEvent(hikari.Event):
 
     def dispatch(self):
         self.bot.event_manager.dispatch(self)
+
+
+async def _create_or_get(cls, id, **kwargs):
+    async with db_session() as session:
+        async with session.begin():
+            instance = await session.get(cls, id)
+            if instance is None:
+                instance = cls(id, **kwargs)
+                session.add(instance)
+    return instance

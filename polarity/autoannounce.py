@@ -21,7 +21,7 @@ from aiohttp import web
 from sqlalchemy import Boolean, Integer
 from sqlalchemy.sql.schema import Column
 from . import cfg
-from .utils import Base as db_base_class
+from .utils import Base as db_base_class, _create_or_get
 
 app = web.Application()
 
@@ -82,26 +82,34 @@ class WeeklyResetSignal(ResetSignal):
     qualifier = "weekly"
 
 
-class LostSectorSignal(BaseCustomEvent, db_base_class):
-    __tablename__ = "lostsectorsignal"
+class LostSectorPostSettings(db_base_class):
+    __tablename__ = "lostsectorpostsettings"
     __mapper_args__ = {"eager_defaults": True}
-    name = Column("id", Integer, primary_key=True)
-    description = Column(
+    id = Column("id", Integer, primary_key=True)
+    autoannounce_enabled = Column(
         "autoannounce_enabled", Boolean, default=True, server_default="t"
     )
 
-    def __init__(
-        self, bot: lightbulb.BotApp, id: int = 0, autoannounce_enabled: bool = True
-    ) -> None:
+    def __init__(self, id, autoannounce_enabled=True):
+        self.id = id
+        self.autoannounce_enabled = autoannounce_enabled
+
+
+class LostSectorSignal(BaseCustomEvent):
+    def __init__(self, bot: lightbulb.BotApp, id: int = 0) -> None:
         super().__init__()
         self.id = id
-        # Need to create or get this
-        self.autoannounce_enabled = autoannounce_enabled
         self.bot = bot
 
-    def conditional_daily_reset_repeater(self, event: DailyResetSignal) -> None:
-        if self.autoannounce_enabled:
+    async def conditional_daily_reset_repeater(self, event: DailyResetSignal) -> None:
+        if await self.is_autoannounce_enabled():
             event.bot.dispatch(self)
+
+    async def is_autoannounce_enabled(self):
+        settings = await _create_or_get(
+            LostSectorPostSettings, 0, autoannounce_enabled=True
+        )
+        return settings.autoannounce_enabled
 
 
 async def lost_sector(event: LostSectorSignal):
