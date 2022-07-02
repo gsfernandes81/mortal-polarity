@@ -13,23 +13,34 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio
-import hikari
-import lightbulb
-import uvloop
+"""Added lost sector settings table
 
-from . import cfg, user_commands
-from .utils import Base
-from .autoannounce import arm
+Revision ID: 73bca89f337b
+Revises: 93c9b7e168c5
+Create Date: 2022-07-02 13:43:03.097809
 
-uvloop.install()
-bot: lightbulb.BotApp = lightbulb.BotApp(**cfg.lightbulb_params)
+"""
+from alembic import op
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
+
+# revision identifiers, used by Alembic.
+revision = "73bca89f337b"
+down_revision = "93c9b7e168c5"
+branch_labels = None
+depends_on = None
 
 
-@bot.listen(hikari.StartedEvent)
-async def on_ready(event: hikari.StartedEvent) -> None:
-    await arm(bot)
+def upgrade() -> None:
+    op.create_table(
+        "lostsectorpostsettings",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column(
+            "autoannounce_enabled", sa.Boolean(), server_default="t", nullable=False
+        ),
+        sa.PrimaryKeyConstraint("id"),
+    )
 
 
-user_commands.register_all(bot)
-bot.run()
+def downgrade() -> None:
+    op.drop_table("lostsectorpostsettings")

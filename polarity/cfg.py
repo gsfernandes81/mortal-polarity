@@ -62,4 +62,4 @@ gsheets_credentials = {
 
 sheets_ls_url = _getenv("SHEETS_LS_URL")
 
-port = int(_getenv("PORT")) or 5000
+port = int(_getenv("PORT") or 5000)

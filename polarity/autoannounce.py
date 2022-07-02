@@ -97,7 +97,7 @@ class LostSectorPostSettings(db_base_class):
 
 class LostSectorSignal(BaseCustomEvent):
     def __init__(self, bot: lightbulb.BotApp, id: int = 0) -> None:
-        super().__init__()
+        super().__init__(bot)
         self.id = id
         self.bot = bot
 
@@ -111,9 +111,15 @@ class LostSectorSignal(BaseCustomEvent):
         )
         return settings.autoannounce_enabled
 
+    def arm(self) -> None:
+        self.bot.listen()(self.conditional_daily_reset_repeater)
 
-async def lost_sector(event: LostSectorSignal):
-    for channel_id in []:
+
+async def lost_sector_announcer(event: LostSectorSignal):
+    for channel_id in [
+        # Test channel, not for prod
+        986342568151379971,
+    ]:
         channel = await event.bot.rest.fetch_channel(channel_id)
         # Can add hikari.GuildNewsChannel for announcement channel support
         # could be useful if we automate more stuff for Kyber
@@ -126,7 +132,7 @@ async def lost_sector(event: LostSectorSignal):
 def _wire_listeners(bot: lightbulb.BotApp) -> None:
     """Connects all listener coroutines to the bot"""
     for handler in [
-        lost_sector,
+        lost_sector_announcer,
     ]:
         bot.listen()(handler)
 
@@ -135,6 +141,7 @@ async def arm(bot: lightbulb.BotApp) -> None:
     # Arm all signals
     DailyResetSignal(bot).arm()
     WeeklyResetSignal(bot).arm()
+    LostSectorSignal(bot).arm()
     # Connect listeners to the bot
     _wire_listeners(bot)
     # Start the web server for periodic signals from apscheduler
