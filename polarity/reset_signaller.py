@@ -24,6 +24,7 @@
 # https://github.com/agronholm/apscheduler/issues/465
 
 import aiohttp
+import asyncio
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -90,4 +91,10 @@ def add_remote_announce():
 
 
 def start():
+    """Blocking function to start the scheduler"""
     _scheduler.start()
+    asyncio.get_event_loop().run_forever()
+
+
+if __name__ == "__main__":
+    start()
