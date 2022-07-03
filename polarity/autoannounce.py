@@ -18,11 +18,14 @@ import logging
 import hikari
 import lightbulb
 from aiohttp import web
-from sqlalchemy import Boolean, Integer
+from sqlalchemy import BigInteger, Boolean, Integer
+from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql.schema import Column
+
 from . import cfg
-from .utils import Base as db_base_class, _create_or_get
 from .user_commands import get_lost_sector_text
+from .utils import Base as db_base_class
+from .utils import _create_or_get
 
 app = web.Application()
 
@@ -114,6 +117,32 @@ class LostSectorSignal(BaseCustomEvent):
 
     def arm(self) -> None:
         self.bot.listen()(self.conditional_daily_reset_repeater)
+
+
+class AutopostServers(db_base_class):
+    __tablename__ = "autopostservers"
+    __mapper_args__ = {"eager_defaults": True}
+    id = Column("id", BigInteger, primary_key=True)
+    enabled = Column("enabled", Boolean, default=True, server_default="t")
+    lost_sector_channels = relationship(
+        "lostsectorautopostchannels", back_populates="autopostserver"
+    )
+
+    def __init__(self, id: int, enabled: bool = True):
+        self.id = id
+        self.enabled = enabled
+
+
+class LostSectorAutopostChannels(db_base_class):
+    __tablename__ = "lostsectorautopostchannels"
+    __mapper_args__ = {"eager_defaults": True}
+    id = Column("id", BigInteger, primary_key=True)
+    server = relationship(
+        "autopostservers", back_populates="lostsectorautopostchannels"
+    )
+
+    def __init__(self, id: int):
+        self.id = id
 
 
 async def lost_sector_announcer(event: LostSectorSignal):
