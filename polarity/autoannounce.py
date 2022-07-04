@@ -170,7 +170,12 @@ async def lost_sector_announcer(event: LostSectorSignal):
     )
 
 
-@lightbulb.command("autopost", "Server autopost management")
+@lightbulb.add_checks(
+    lightbulb.checks.has_guild_permissions(hikari.Permissions.ADMINISTRATOR)
+)
+@lightbulb.command(
+    "autopost", "Server autopost management, can be used by server administrators only"
+)
 @lightbulb.implements(lightbulb.SlashCommandGroup)
 async def autopost_cmd_group(ctx: lightbulb.Context) -> None:
     await ctx.respond(
@@ -191,6 +196,7 @@ async def autopost_cmd_group(ctx: lightbulb.Context) -> None:
     "Lost sector auto posts",
     auto_defer=True,
     guilds=cfg.kyber_discord_server_id,
+    inherit_checks=True,
 )
 @lightbulb.implements(lightbulb.SlashSubCommand)
 async def lost_sector_auto(ctx: lightbulb.Context) -> None:
@@ -207,6 +213,17 @@ async def lost_sector_auto(ctx: lightbulb.Context) -> None:
                 channel.enabled = option
     await ctx.respond(
         "Lost sector autoposts {}".format("enabled" if option else "disabled")
+    )
+
+
+@autopost_cmd_group.set_error_handler
+async def announcements_error_handler(
+    event: lightbulb.MissingRequiredPermission,
+) -> None:
+    ctx = event.context
+    await ctx.respond(
+        "You cannot change this setting because you "
+        + 'do not have "Administrator" permissions in this server'
     )
 
 
