@@ -188,7 +188,7 @@ async def autopost_cmd_group(ctx: lightbulb.Context) -> None:
     "option",
     "Enabled or disabled",
     type=str,
-    choices=["Enabled", "Disabled"],
+    choices=["Enable", "Disable"],
     required=True,
 )
 @lightbulb.command(
@@ -202,7 +202,10 @@ async def autopost_cmd_group(ctx: lightbulb.Context) -> None:
 async def lost_sector_auto(ctx: lightbulb.Context) -> None:
     channel_id: int = ctx.channel_id
     server_id: int = ctx.guild_id
-    option: bool = True if ctx.options.option.lower() == "enabled" else False
+    # Should match both Enable and Enabled in case discord servers
+    # have not finished updating and send the old "Enabled" option
+    # Can be changed to == "enable" in a few hours
+    option: bool = True if ctx.options.option.lower().startswith("enable") else False
     async with db_session() as session:
         async with session.begin():
             channel = await session.get(LostSectorAutopostChannel, channel_id)
