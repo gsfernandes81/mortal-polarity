@@ -20,13 +20,13 @@ import logging
 import hikari
 import lightbulb
 from aiohttp import web
-from sqlalchemy import BigInteger, Boolean, Integer, select
-from sqlalchemy.sql.schema import Column
+from sqlalchemy import select
 
 from . import cfg
 from .user_commands import get_lost_sector_text
-from .utils import Base as db_base_class
-from .utils import _create_or_get, db_session
+from .utils import _create_or_get
+from .schemas import db_session
+from .schemas import LostSectorPostSettings, LostSectorAutopostChannel
 
 app = web.Application()
 
@@ -87,19 +87,6 @@ class WeeklyResetSignal(ResetSignal):
     qualifier = "weekly"
 
 
-class LostSectorPostSettings(db_base_class):
-    __tablename__ = "lostsectorpostsettings"
-    __mapper_args__ = {"eager_defaults": True}
-    id = Column("id", Integer, primary_key=True)
-    autoannounce_enabled = Column(
-        "autoannounce_enabled", Boolean, default=True, server_default="t"
-    )
-
-    def __init__(self, id, autoannounce_enabled=True):
-        self.id = id
-        self.autoannounce_enabled = autoannounce_enabled
-
-
 class LostSectorSignal(BaseCustomEvent):
     def __init__(self, bot: lightbulb.BotApp, id: int = 0) -> None:
         super().__init__(bot)
@@ -118,19 +105,6 @@ class LostSectorSignal(BaseCustomEvent):
 
     def arm(self) -> None:
         self.bot.listen()(self.conditional_daily_reset_repeater)
-
-
-class LostSectorAutopostChannel(db_base_class):
-    __tablename__ = "lostsectorautopostchannel"
-    __mapper_args__ = {"eager_defaults": True}
-    id = Column("id", BigInteger, primary_key=True)
-    server_id = Column("server_id", BigInteger)
-    enabled = Column("enabled", Boolean)
-
-    def __init__(self, id: int, server_id: int, enabled: bool):
-        self.id = id
-        self.server_id = server_id
-        self.enabled = enabled
 
 
 async def lost_sector_announcer(event: LostSectorSignal):

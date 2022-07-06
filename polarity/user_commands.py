@@ -25,27 +25,13 @@ import lightbulb
 from pytz import utc
 from sector_accounting import Rotation
 from sqlalchemy.sql.expression import delete, select
-from sqlalchemy.sql.schema import Column
-from sqlalchemy.sql.sqltypes import String
 
 from . import cfg
-from .utils import Base, RefreshCmdListEvent, db_session, url_regex
+from .utils import RefreshCmdListEvent, url_regex
+from .schemas import db_session
+from .schemas import Commands
 
 command_registry = {}
-
-
-class Commands(Base):
-    __tablename__ = "commands"
-    __mapper_args__ = {"eager_defaults": True}
-    name = Column("name", String, primary_key=True)
-    description = Column("description", String)
-    response = Column("response", String)
-
-    def __init__(self, name, description, response):
-        super().__init__()
-        self.name = name
-        self.description = description
-        self.response = response
 
 
 @lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))

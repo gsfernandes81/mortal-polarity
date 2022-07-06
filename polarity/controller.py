@@ -15,10 +15,10 @@
 
 import lightbulb
 
-from polarity.autoannounce import LostSectorPostSettings
+from polarity.schemas import LostSectorPostSettings
 
 from . import cfg
-from .utils import db_session
+from .schemas import db_session
 
 
 @lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
