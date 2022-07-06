@@ -52,10 +52,7 @@ async def kyber():
 )
 @lightbulb.implements(lightbulb.SlashSubCommand)
 async def announcements(ctx: lightbulb.Context):
-    # Should match both Enable and Enabled in case discord servers
-    # have not finished updating and send the old "Enabled" option
-    # Can be changed to == "enable" in a few hours
-    option = True if ctx.options.option.lower().startswith("enable") else False
+    option = True if ctx.options.option.lower() == "enable" else False
     async with db_session() as session:
         async with session.begin():
             settings = await session.get(LostSectorPostSettings, 0)
