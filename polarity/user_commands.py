@@ -301,7 +301,7 @@ async def user_command(ctx: lightbulb.Context):
         for link in links:
             async with session.get(link) as response:
                 redirected_links.append(str(response.url))
-                logging.debug(
+                logging.info(
                     "Replacing link: {} with redirect: {}".format(
                         link, redirected_links[-1]
                     )
