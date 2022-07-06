@@ -13,14 +13,7 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
-import aiohttp
-import hikari
 import lightbulb
-from pytz import utc
-from sector_accounting import Rotation
-from sqlalchemy.sql.expression import select
-from sqlalchemy.sql.schema import Column
-from sqlalchemy.sql.sqltypes import String
 
 from polarity.autoannounce import LostSectorPostSettings
 

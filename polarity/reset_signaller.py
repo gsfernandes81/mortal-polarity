@@ -23,8 +23,9 @@
 # The relevant tracking issue for apscheduler 4.x is:
 # https://github.com/agronholm/apscheduler/issues/465
 
-import aiohttp
 import asyncio
+
+import aiohttp
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger

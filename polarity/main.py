@@ -13,14 +13,13 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio
 import hikari
 import lightbulb
 import uvloop
 
-from . import cfg, user_commands, debug_commands, controller
-from .utils import Base
+from . import cfg, controller, debug_commands, user_commands
 from .autoannounce import arm
+from .utils import Base
 
 uvloop.install()
 bot: lightbulb.BotApp = lightbulb.BotApp(**cfg.lightbulb_params)

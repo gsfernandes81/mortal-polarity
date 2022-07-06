@@ -14,6 +14,7 @@
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
 from os import getenv as _getenv
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Discord API Token
