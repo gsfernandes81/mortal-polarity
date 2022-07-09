@@ -21,7 +21,7 @@ from typing import Union
 import hikari
 import lightbulb
 from aiohttp import web
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from . import cfg
 from .user_commands import get_lost_sector_text
@@ -126,11 +126,25 @@ async def lost_sector_announcer(event: LostSectorSignal):
     embed = await get_lost_sector_text()
 
     async def _send_embed_if_guild_channel(channel_id: int) -> None:
-        channel = await event.bot.rest.fetch_channel(channel_id)
-        # Can add hikari.GuildNewsChannel for announcement channel support
-        # could be useful if we automate more stuff for Kyber
-        if isinstance(channel, hikari.GuildTextChannel):
-            await channel.send(embed=embed)
+        try:
+            channel = await event.bot.rest.fetch_channel(channel_id)
+            # Can add hikari.GuildNewsChannel for announcement channel support
+            # could be useful if we automate more stuff for Kyber
+            if isinstance(channel, hikari.GuildTextChannel):
+                await channel.send(embed=embed)
+        except (hikari.ForbiddenError, hikari.NotFoundError):
+            logging.warning(
+                "Channel {} not found or not messageable, disabling lost sector posts".format(
+                    channel_id
+                )
+            )
+            async with db_session() as session:
+                async with session.begin():
+                    await session.execute(
+                        update(LostSectorAutopostChannel)
+                        .where(LostSectorAutopostChannel.id == channel_id)
+                        .values(enabled=False)
+                    )
 
     await asyncio.gather(
         *[_send_embed_if_guild_channel(channel_id) for channel_id in channel_id_list]
