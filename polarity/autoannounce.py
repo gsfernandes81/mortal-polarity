@@ -16,6 +16,7 @@
 import asyncio
 import datetime as dt
 import logging
+from typing import Union
 
 import hikari
 import lightbulb
@@ -177,17 +178,24 @@ async def lost_sector_auto(ctx: lightbulb.Context) -> None:
     channel_id: int = ctx.channel_id
     server_id: int = ctx.guild_id
     option: bool = True if ctx.options.option.lower() == "enable" else False
-    async with db_session() as session:
-        async with session.begin():
-            channel = await session.get(LostSectorAutopostChannel, channel_id)
-            if channel is None:
-                channel = LostSectorAutopostChannel(channel_id, server_id, option)
-                session.add(channel)
-            else:
-                channel.enabled = option
-    await ctx.respond(
-        "Lost sector autoposts {}".format("enabled" if option else "disabled")
-    )
+    bot = ctx.bot
+    if await _bot_has_message_perms(bot, channel_id):
+        async with db_session() as session:
+            async with session.begin():
+                channel = await session.get(LostSectorAutopostChannel, channel_id)
+                if channel is None:
+                    channel = LostSectorAutopostChannel(channel_id, server_id, option)
+                    session.add(channel)
+                else:
+                    channel.enabled = option
+        await ctx.respond(
+            "Lost sector autoposts {}".format("enabled" if option else "disabled")
+        )
+    else:
+        await ctx.respond(
+            'The bot does not have the "Send Messages" or the'
+            + ' "Send Messages in Threads" permission here'
+        )
 
 
 @autopost_cmd_group.set_error_handler
@@ -207,6 +215,34 @@ def _wire_listeners(bot: lightbulb.BotApp) -> None:
         lost_sector_announcer,
     ]:
         bot.listen()(handler)
+
+
+async def _bot_has_message_perms(
+    bot: lightbulb.BotApp, channel: Union[hikari.TextableChannel, int]
+) -> bool:
+    if not isinstance(channel, hikari.TextableChannel):
+        channel = await bot.rest.fetch_channel(channel)
+    if isinstance(channel, hikari.TextableChannel):
+        if isinstance(channel, hikari.TextableGuildChannel):
+            guild = await channel.fetch_guild()
+            self_member = await bot.rest.fetch_member(guild, bot.get_me())
+            perms = lightbulb.utils.permissions_in(channel, self_member)
+            # Check if we have the send messages permission in the channel
+            # Refer to hikari.Permissions to see how / why this works
+            # Note: Hikari doesn't recognize threads
+            # Channel types 10, 11, 12 and 15 are thread types as specified in:
+            # https://discord.com/developers/docs/resources/channel#channel-object-channel-types
+            # If the channel is a thread, we need to check for the SEND_MESSAGES_IN_THREADS perm
+            if channel.type in [10, 11, 12, 15]:
+                return (
+                    hikari.Permissions.SEND_MESSAGES_IN_THREADS & perms
+                ) == hikari.Permissions.SEND_MESSAGES_IN_THREADS
+            else:
+                return (
+                    hikari.Permissions.SEND_MESSAGES & perms
+                ) == hikari.Permissions.SEND_MESSAGES
+        else:
+            return True
 
 
 async def arm(bot: lightbulb.BotApp) -> None:
