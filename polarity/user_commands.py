@@ -352,5 +352,5 @@ async def get_lost_sector_text(date: dt.date = None) -> hikari.Embed:
             + "\n"
             + "**More Info:** <https://kyber3000.com/LS>"
         ).format(**format_dict),
-        color=hikari.Color(0xEC42A5),
+        color=cfg.kyber_pink,
     ).set_image(ls_gfx_url)
