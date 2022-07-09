@@ -42,6 +42,7 @@ class LostSectorAutopostChannel(Base):
     __tablename__ = "lostsectorautopostchannel"
     __mapper_args__ = {"eager_defaults": True}
     id = Column("id", BigInteger, primary_key=True)
+    # Note: if server_id is -1 then this is a dm channel
     server_id = Column("server_id", BigInteger)
     enabled = Column("enabled", Boolean)
 

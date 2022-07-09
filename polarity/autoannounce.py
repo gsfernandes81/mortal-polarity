@@ -23,7 +23,7 @@ import lightbulb
 from aiohttp import web
 from sqlalchemy import select, update
 
-from . import cfg
+from . import cfg, custom_checks
 from .user_commands import get_lost_sector_text
 from .utils import _create_or_get
 from .schemas import db_session
@@ -125,12 +125,12 @@ async def lost_sector_announcer(event: LostSectorSignal):
     start_time = dt.datetime.now()
     embed = await get_lost_sector_text()
 
-    async def _send_embed_if_guild_channel(channel_id: int) -> None:
+    async def _send_embed_if_textable_channel(channel_id: int) -> None:
         try:
             channel = await event.bot.rest.fetch_channel(channel_id)
             # Can add hikari.GuildNewsChannel for announcement channel support
             # could be useful if we automate more stuff for Kyber
-            if isinstance(channel, hikari.GuildTextChannel):
+            if isinstance(channel, hikari.TextableChannel):
                 await channel.send(embed=embed)
         except (hikari.ForbiddenError, hikari.NotFoundError):
             logging.warning(
@@ -147,7 +147,7 @@ async def lost_sector_announcer(event: LostSectorSignal):
                     )
 
     await asyncio.gather(
-        *[_send_embed_if_guild_channel(channel_id) for channel_id in channel_id_list]
+        *[_send_embed_if_textable_channel(channel_id) for channel_id in channel_id_list]
     )
 
     end_time = dt.datetime.now()
@@ -160,7 +160,8 @@ async def lost_sector_announcer(event: LostSectorSignal):
 
 
 @lightbulb.add_checks(
-    lightbulb.checks.has_guild_permissions(hikari.Permissions.ADMINISTRATOR)
+    lightbulb.checks.dm_only
+    | custom_checks.has_guild_permissions(hikari.Permissions.ADMINISTRATOR)
 )
 @lightbulb.command(
     "autopost", "Server autopost management, can be used by server administrators only"
@@ -190,7 +191,7 @@ async def autopost_cmd_group(ctx: lightbulb.Context) -> None:
 @lightbulb.implements(lightbulb.SlashSubCommand)
 async def lost_sector_auto(ctx: lightbulb.Context) -> None:
     channel_id: int = ctx.channel_id
-    server_id: int = ctx.guild_id
+    server_id: int = ctx.guild_id if ctx.guild_id is not None else -1
     option: bool = True if ctx.options.option.lower() == "enable" else False
     bot = ctx.bot
     if await _bot_has_message_perms(bot, channel_id):
