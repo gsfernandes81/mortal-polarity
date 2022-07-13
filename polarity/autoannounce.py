@@ -27,7 +27,7 @@ from . import cfg, custom_checks
 from .user_commands import get_lost_sector_text
 from .utils import _create_or_get
 from .schemas import db_session
-from .schemas import LostSectorPostSettings, LostSectorAutopostChannel
+from .schemas import LostSectorPostSettings, LostSectorAutopostChannel, XurPostSettings
 
 app = web.Application()
 
@@ -88,12 +88,11 @@ class WeeklyResetSignal(ResetSignal):
     qualifier = "weekly"
 
 
-class LostSectorSignal(BaseCustomEvent):
-    def __init__(self, bot: lightbulb.BotApp, id: int = 0) -> None:
-        super().__init__(bot)
-        self.id = id
-        self.bot = bot
+class WeekendResetSignal(ResetSignal):
+    qualifier = "weekend"
 
+
+class LostSectorSignal(BaseCustomEvent):
     async def conditional_daily_reset_repeater(self, event: DailyResetSignal) -> None:
         if await self.is_autoannounce_enabled():
             event.bot.dispatch(self)
@@ -106,6 +105,21 @@ class LostSectorSignal(BaseCustomEvent):
 
     def arm(self) -> None:
         self.bot.listen()(self.conditional_daily_reset_repeater)
+
+
+class XurSignal(BaseCustomEvent):
+    async def conditional_weekend_reset_repeater(
+        self, event: WeekendResetSignal
+    ) -> None:
+        if await self.is_autoannounce_enabled():
+            event.bot.dispatch(self)
+
+    async def is_autoannounce_enabled(self):
+        settings = await _create_or_get(XurPostSettings, 0, autoannounce_enabled=True)
+        return settings.autoannounce_enabled
+
+    def arm(self) -> None:
+        self.bot.listen()(self.conditional_weekend_reset_repeater)
 
 
 async def lost_sector_announcer(event: LostSectorSignal):
@@ -264,7 +278,9 @@ async def arm(bot: lightbulb.BotApp) -> None:
     # Arm all signals
     DailyResetSignal(bot).arm()
     WeeklyResetSignal(bot).arm()
+    WeekendResetSignal(bot).arm()
     LostSectorSignal(bot).arm()
+    XurSignal(bot).arm()
     # Connect listeners to the bot
     _wire_listeners(bot)
     # Connect commands

@@ -38,6 +38,19 @@ class LostSectorPostSettings(Base):
         self.autoannounce_enabled = autoannounce_enabled
 
 
+class XurPostSettings(Base):
+    __tablename__ = "xurpostsettings"
+    __mapper_args__ = {"eager_defaults": True}
+    id = Column("id", Integer, primary_key=True)
+    autoannounce_enabled = Column(
+        "autoannounce_enabled", Boolean, default=True, server_default="t"
+    )
+
+    def __init__(self, id, autoannounce_enabled=True):
+        self.id = id
+        self.autoannounce_enabled = autoannounce_enabled
+
+
 class LostSectorAutopostChannel(Base):
     __tablename__ = "lostsectorautopostchannel"
     __mapper_args__ = {"eager_defaults": True}

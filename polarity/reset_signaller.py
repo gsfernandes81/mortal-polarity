@@ -63,6 +63,15 @@ async def remote_weekly_reset():
         )
 
 
+async def remote_weekend_reset():
+    print("Sending weekend signal")
+    async with aiohttp.ClientSession() as session:
+        await session.post(
+            "http://127.0.0.1:{}/weekend-reset-signal".format(cfg.port),
+            verify_ssl=False,
+        )
+
+
 # This needs to be called at release
 def add_remote_announce():
     # (Re)Add the scheduled job that signals destiny 2 reset
@@ -84,6 +93,16 @@ def add_remote_announce():
         ),
         replace_existing=True,
         id="1",
+    )
+    _scheduler.add_job(
+        remote_weekend_reset,
+        CronTrigger(
+            day_of_week="fri",
+            hour=17,
+            timezone=utc,
+        ),
+        replace_existing=True,
+        id="2",
     )
 
     # Start up then shut down the scheduler to commit changes to the DB
