@@ -16,12 +16,19 @@
 import re
 
 import hikari
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-from .schemas import db_session
+from . import cfg
 
 url_regex = re.compile(
     "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
 )
+
+
+Base = declarative_base()
+db_engine = create_async_engine(cfg.db_url_async)
+db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
 
 
 class RefreshCmdListEvent(hikari.Event):

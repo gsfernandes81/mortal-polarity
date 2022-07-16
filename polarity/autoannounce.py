@@ -25,8 +25,7 @@ from sqlalchemy import select, update
 
 from . import cfg, custom_checks
 from .user_commands import get_lost_sector_text
-from .utils import _create_or_get
-from .schemas import db_session
+from .utils import _create_or_get, db_session
 from .schemas import LostSectorPostSettings, LostSectorAutopostChannel, XurPostSettings
 
 app = web.Application()
@@ -111,8 +110,13 @@ class XurSignal(BaseCustomEvent):
     async def conditional_weekend_reset_repeater(
         self, event: WeekendResetSignal
     ) -> None:
-        if await self.is_autoannounce_enabled():
-            event.bot.dispatch(self)
+        if not await self.is_autoannounce_enabled():
+            return
+        async with db_session() as session:
+            async with session.begin():
+                settings: XurPostSettings = await session.get(XurPostSettings, 0)
+            await settings.wait_for_url_update(session)
+        event.bot.dispatch(self)
 
     async def is_autoannounce_enabled(self):
         settings = await _create_or_get(XurPostSettings, 0, autoannounce_enabled=True)
