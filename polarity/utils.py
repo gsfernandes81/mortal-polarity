@@ -13,9 +13,12 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
+import datetime as dt
 import re
+from typing import Tuple
 
 import hikari
+from pytz import utc
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -54,3 +57,32 @@ async def _create_or_get(cls, id, **kwargs):
                 instance = cls(id, **kwargs)
                 session.add(instance)
     return instance
+
+
+def weekend_period(today: dt.datetime = None) -> Tuple[dt.datetime, dt.datetime]:
+    if today is None:
+        today = dt.datetime.now()
+    today = dt.datetime(today.year, today.month, today.day, tz=utc)
+    monday = today - dt.timedelta(days=today.weekday)
+    # Weekend is friday 1700 UTC to Tuesday 1700 UTC
+    friday = monday + dt.timedelta(days=4) + dt.timedelta(hours=17)
+    tuesday = friday + dt.timedelta(days=4)
+    return friday, tuesday
+
+
+def week_period(today: dt.datetime = None) -> Tuple[dt.datetime, dt.datetime]:
+    if today is None:
+        today = dt.datetime.now()
+    today = dt.datetime(today.year, today.month, today.day, tz=utc)
+    monday = today - dt.timedelta(days=today.weekday)
+    start = monday + dt.timedelta(days=1) + dt.timedelta(hours=17)
+    end = start + dt.timedelta(days=7)
+    return start, end
+
+
+def day_period(today: dt.datetime = None) -> Tuple[dt.datetime, dt.datetime]:
+    if today is None:
+        today = dt.datetime.now()
+    today = dt.datetime(today.year, today.month, today.day, 17, tz=utc)
+    today_end = today + dt.timedelta(days=1)
+    return today, today_end
