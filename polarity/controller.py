@@ -137,7 +137,7 @@ async def xur_gfx_url(ctx: lightbulb.Context):
                         + "The default Xur Infographic url is <{}>"
                     ).format(
                         "unset" if settings is None else settings.url,
-                        "https://kyber3000.com/Xur",
+                        cfg.defaults.xur.gfx_url,
                     )
                 )
                 return
@@ -177,7 +177,7 @@ async def xur_post_url(ctx: lightbulb.Context):
                         + "The default Xur Post url is <{}>"
                     ).format(
                         "unset" if settings is None else settings.post_url,
-                        "https://kyber3000.com/Xurpost",
+                        cfg.defaults.xur.post_url,
                     )
                 )
                 return

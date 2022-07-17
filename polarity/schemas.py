@@ -20,6 +20,7 @@ import aiohttp
 from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String
 from sqlalchemy.sql.schema import Column
 
+from . import cfg
 from .utils import Base, db_engine, db_session
 
 
@@ -41,8 +42,8 @@ class XurPostSettings(Base):
     __mapper_args__ = {"eager_defaults": True}
     id = Column("id", Integer, primary_key=True)
     # url is the infographic url
-    url = Column("url", String, nullable=False, default="https://kyber3000.com/Xur")
-    post_url = Column("post_url", String, default="https://kyber3000.com/Xurpost")
+    url = Column("url", String, nullable=False, default=cfg.defaults.xur.gfx_url)
+    post_url = Column("post_url", String, default=cfg.defaults.xur.post_url)
     url_redirect_target = Column("url_redirect_target", String)
     url_last_modified = Column("url_last_modified", DateTime)
     url_last_checked = Column("url_last_checked", DateTime)
