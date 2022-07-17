@@ -120,6 +120,11 @@ class XurSignal(BaseCustomEvent):
         async with db_session() as session:
             async with session.begin():
                 settings: XurPostSettings = await session.get(XurPostSettings, 0)
+
+            # Debug code
+            if cfg.test_env and cfg.trigger_without_url_update:
+                event.bot.dispatch(self)
+
             await settings.wait_for_url_update(session)
         event.bot.dispatch(self)
 

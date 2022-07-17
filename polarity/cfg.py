@@ -35,8 +35,13 @@ if db_url.startswith("postgres"):
 # Async SQLAlchemy DB Session KWArg Parameters
 db_session_kwargs = {"expire_on_commit": False, "class_": AsyncSession}
 
+# Debug envs
 test_env = _getenv("TEST_ENV") or "false"
 test_env = int(test_env) if test_env != "false" else False
+trigger_without_url_update = _getenv("TRIGGER_WITHOUT_URL_UPDATE") or "false"
+trigger_without_url_update = (
+    True if trigger_without_url_update.lower() == "true" else False
+)
 
 admin_role = int(_getenv("ADMIN_ROLE"))
 
