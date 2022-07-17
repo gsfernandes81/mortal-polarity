@@ -17,6 +17,7 @@ import datetime as dt
 import re
 from typing import Tuple
 
+import aiohttp
 import hikari
 from pytz import utc
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -86,3 +87,9 @@ def day_period(today: dt.datetime = None) -> Tuple[dt.datetime, dt.datetime]:
     today = dt.datetime(today.year, today.month, today.day, 17, tzinfo=utc)
     today_end = today + dt.timedelta(days=1)
     return today, today_end
+
+
+async def follow_link_single_step(url: str) -> str:
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, allow_redirects=False) as resp:
+            return resp.headers["Location"]

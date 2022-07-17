@@ -27,7 +27,12 @@ from sector_accounting import Rotation
 from sqlalchemy.sql.expression import delete, select
 
 from . import cfg
-from .utils import RefreshCmdListEvent, url_regex
+from .utils import (
+    RefreshCmdListEvent,
+    url_regex,
+    weekend_period,
+    follow_link_single_step,
+)
 from .schemas import db_session
 from .schemas import Commands
 
@@ -356,7 +361,31 @@ async def get_lost_sector_text(date: dt.date = None) -> hikari.Embed:
     ).set_image(ls_gfx_url)
 
 
-async def get_xur_text(gfx_url, post_url):
+async def get_xur_text(gfx_url, post_url, date: dt.date = None):
+    if date is None:
+        date = dt.datetime.now(tz=utc)
+    start_date, end_date = weekend_period(date)
+
+    # Follow urls 1 step into redirects
+    gfx_url = await follow_link_single_step(gfx_url)
+    post_url = await follow_link_single_step(post_url)
+
+    format_dict = {
+        "start_month": month[start_date.month],
+        "end_month": month[end_date.month],
+        "start_day": start_date.day,
+        "start_day_name": start_date.strftime("%A"),
+        "end_day": end_date.day,
+        "end_day_name": end_date.strftime("%A"),
+        "post_url": post_url,
+        "gfx_url": gfx_url,
+    }
     return hikari.Embed(
-        title="Testing testing", description="{}\n{}".format(gfx_url, post_url)
-    )
+        title=("Xur's Inventory and Location").format(**format_dict),
+        url=format_dict["post_url"],
+        description=(
+            "**Arrives:** {start_day_name}, {start_month} {start_day}\n"
+            + "**Departs:** {end_day_name}, {end_month} {end_day}"
+        ).format(**format_dict),
+        color=cfg.kyber_pink,
+    ).set_image(format_dict["gfx_url"])
