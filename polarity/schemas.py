@@ -104,6 +104,7 @@ class LostSectorAutopostChannel(Base):
     id = Column("id", BigInteger, primary_key=True)
     # Note: if server_id is -1 then this is a dm channel
     server_id = Column("server_id", BigInteger)
+    last_msg_id = Column("last_msg_id", BigInteger)
     enabled = Column("enabled", Boolean)
 
     def __init__(self, id: int, server_id: int, enabled: bool):
@@ -118,6 +119,7 @@ class XurAutopostChannel(Base):
     id = Column("id", BigInteger, primary_key=True)
     # Note: if server_id is -1 then this is a dm channel
     server_id = Column("server_id", BigInteger)
+    last_msg_id = Column("last_msg_id", BigInteger)
     enabled = Column("enabled", Boolean)
 
     def __init__(self, id: int, server_id: int, enabled: bool):

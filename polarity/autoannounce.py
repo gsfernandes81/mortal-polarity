@@ -136,6 +136,40 @@ class XurSignal(BaseCustomEvent):
         self.bot.listen()(self.conditional_weekend_reset_repeater)
 
 
+async def _send_embed_if_textable_channel(
+    channel_id: int,
+    event: hikari.Event,
+    embed: hikari.Embed,
+    channel_record,  # Must be the class of the channel, not an instance
+) -> None:
+    try:
+        channel = await event.bot.rest.fetch_channel(channel_id)
+        # Can add hikari.GuildNewsChannel for announcement channel support
+        # could be useful if we automate more stuff for Kyber
+        if isinstance(channel, hikari.TextableChannel):
+            async with db_session() as session:
+                async with session.begin():
+                    channel_record_instance = await session.get(
+                        channel_record, channel_id
+                    )
+                    channel_record_instance.last_msg_id = await channel.send(
+                        embed=embed
+                    )
+    except (hikari.ForbiddenError, hikari.NotFoundError):
+        logging.warning(
+            "Channel {} not found or not messageable, disabling posts in {}".format(
+                channel_id, str(channel_record.__class__.__name__)
+            )
+        )
+        async with db_session() as session:
+            async with session.begin():
+                await session.execute(
+                    update(channel_record)
+                    .where(channel_record.id == channel_id)
+                    .values(enabled=False)
+                )
+
+
 async def lost_sector_announcer(event: LostSectorSignal):
     async with db_session() as session:
         async with session.begin():
@@ -153,29 +187,16 @@ async def lost_sector_announcer(event: LostSectorSignal):
     start_time = dt.datetime.now()
     embed = await get_lost_sector_text()
 
-    async def _send_embed_if_textable_channel(channel_id: int) -> None:
-        try:
-            channel = await event.bot.rest.fetch_channel(channel_id)
-            # Can add hikari.GuildNewsChannel for announcement channel support
-            # could be useful if we automate more stuff for Kyber
-            if isinstance(channel, hikari.TextableChannel):
-                await channel.send(embed=embed)
-        except (hikari.ForbiddenError, hikari.NotFoundError):
-            logging.warning(
-                "Channel {} not found or not messageable, disabling lost sector posts".format(
-                    channel_id
-                )
-            )
-            async with db_session() as session:
-                async with session.begin():
-                    await session.execute(
-                        update(LostSectorAutopostChannel)
-                        .where(LostSectorAutopostChannel.id == channel_id)
-                        .values(enabled=False)
-                    )
-
     await asyncio.gather(
-        *[_send_embed_if_textable_channel(channel_id) for channel_id in channel_id_list]
+        *[
+            _send_embed_if_textable_channel(
+                channel_id,
+                event,
+                embed,
+                LostSectorAutopostChannel,
+            )
+            for channel_id in channel_id_list
+        ]
     )
 
     end_time = dt.datetime.now()
@@ -202,44 +223,31 @@ async def xur_announcer(event: XurSignal):
             channel_id_list = [] if channel_id_list is None else channel_id_list
             channel_id_list = [channel[0].id for channel in channel_id_list]
 
-    logging.info("Announcing xur posts to {} channels".format(len(channel_id_list)))
-    start_time = dt.datetime.now()
-    embed = await get_xur_text(settings.url, settings.post_url)
+        logging.info("Announcing xur posts to {} channels".format(len(channel_id_list)))
+        start_time = dt.datetime.now()
+        embed = await get_xur_text(settings.url, settings.post_url)
 
-    async def _send_embed_if_textable_channel(channel_id: int) -> None:
-        try:
-            channel = await event.bot.rest.fetch_channel(channel_id)
-            # Can add hikari.GuildNewsChannel for announcement channel support
-            # could be useful if we automate more stuff for Kyber
-            if isinstance(channel, hikari.TextableChannel):
-                await channel.send(embed=embed)
-        except (hikari.ForbiddenError, hikari.NotFoundError):
-            logging.warning(
-                "Channel {} not found or not messageable, disabling xur posts".format(
-                    channel_id
+        await asyncio.gather(
+            *[
+                _send_embed_if_textable_channel(
+                    channel_id,
+                    event,
+                    embed,
+                    XurAutopostChannel,
                 )
-            )
-            async with db_session() as session:
-                async with session.begin():
-                    await session.execute(
-                        update(XurAutopostChannel)
-                        .where(XurAutopostChannel.id == channel_id)
-                        .values(enabled=False)
-                    )
-
-    await asyncio.gather(
-        *[_send_embed_if_textable_channel(channel_id) for channel_id in channel_id_list]
-    )
-
-    end_time = dt.datetime.now()
-    time_delta = end_time - start_time
-    minutes = time_delta.seconds // 60
-    seconds = time_delta.seconds % 60
-    logging.info(
-        "Xur announcement completed in {} minutes and {} seconds".format(
-            minutes, seconds
+                for channel_id in channel_id_list
+            ]
         )
-    )
+
+        end_time = dt.datetime.now()
+        time_delta = end_time - start_time
+        minutes = time_delta.seconds // 60
+        seconds = time_delta.seconds % 60
+        logging.info(
+            "Xur announcement completed in {} minutes and {} seconds".format(
+                minutes, seconds
+            )
+        )
 
 
 @lightbulb.add_checks(
