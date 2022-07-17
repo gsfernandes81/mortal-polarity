@@ -24,9 +24,14 @@ from aiohttp import web
 from sqlalchemy import select, update
 
 from . import cfg, custom_checks
-from .user_commands import get_lost_sector_text
+from .user_commands import get_lost_sector_text, get_xur_text
 from .utils import _create_or_get, db_session
-from .schemas import LostSectorPostSettings, LostSectorAutopostChannel, XurPostSettings
+from .schemas import (
+    LostSectorPostSettings,
+    LostSectorAutopostChannel,
+    XurPostSettings,
+    XurAutopostChannel,
+)
 
 app = web.Application()
 
@@ -173,7 +178,62 @@ async def lost_sector_announcer(event: LostSectorSignal):
     minutes = time_delta.seconds // 60
     seconds = time_delta.seconds % 60
     logging.info(
-        "Announcement completed in {} minutes and {} seconds".format(minutes, seconds)
+        "Lost Sector announcements completed in {} minutes and {} seconds".format(
+            minutes, seconds
+        )
+    )
+
+
+async def xur_announcer(event: XurSignal):
+    async with db_session() as session:
+        async with session.begin():
+            settings: XurPostSettings = await session.get(XurPostSettings, 0)
+        async with session.begin():
+            channel_id_list = (
+                await session.execute(
+                    select(XurAutopostChannel).where(XurAutopostChannel.enabled == True)
+                )
+            ).fetchall()
+            channel_id_list = [] if channel_id_list is None else channel_id_list
+            channel_id_list = [channel[0].id for channel in channel_id_list]
+
+    logging.info("Announcing xur posts to {} channels".format(len(channel_id_list)))
+    start_time = dt.datetime.now()
+    embed = await get_xur_text(settings.url, settings.post_url)
+
+    async def _send_embed_if_textable_channel(channel_id: int) -> None:
+        try:
+            channel = await event.bot.rest.fetch_channel(channel_id)
+            # Can add hikari.GuildNewsChannel for announcement channel support
+            # could be useful if we automate more stuff for Kyber
+            if isinstance(channel, hikari.TextableChannel):
+                await channel.send(embed=embed)
+        except (hikari.ForbiddenError, hikari.NotFoundError):
+            logging.warning(
+                "Channel {} not found or not messageable, disabling xur posts".format(
+                    channel_id
+                )
+            )
+            async with db_session() as session:
+                async with session.begin():
+                    await session.execute(
+                        update(XurAutopostChannel)
+                        .where(XurAutopostChannel.id == channel_id)
+                        .values(enabled=False)
+                    )
+
+    await asyncio.gather(
+        *[_send_embed_if_textable_channel(channel_id) for channel_id in channel_id_list]
+    )
+
+    end_time = dt.datetime.now()
+    time_delta = end_time - start_time
+    minutes = time_delta.seconds // 60
+    seconds = time_delta.seconds % 60
+    logging.info(
+        "Xur announcement completed in {} minutes and {} seconds".format(
+            minutes, seconds
+        )
     )
 
 
@@ -244,9 +304,7 @@ async def announcements_error_handler(
 
 def _wire_listeners(bot: lightbulb.BotApp) -> None:
     """Connects all listener coroutines to the bot"""
-    for handler in [
-        lost_sector_announcer,
-    ]:
+    for handler in [lost_sector_announcer, xur_announcer]:
         bot.listen()(handler)
 
 

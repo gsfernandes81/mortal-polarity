@@ -40,16 +40,18 @@ class XurPostSettings(Base):
     __tablename__ = "xurpostsettings"
     __mapper_args__ = {"eager_defaults": True}
     id = Column("id", Integer, primary_key=True)
+    # url is the infographic url
     url = Column("url", String, nullable=False, default="https://kyber3000.com/Xur")
-    url_redirect_target = Column("redirect_target", String)
-    url_last_modified = Column("last_modified", DateTime)
-    url_last_checked = Column("last_checked", DateTime)
+    post_url = Column("post_url", String, default="https://kyber3000.com/Xurpost")
+    url_redirect_target = Column("url_redirect_target", String)
+    url_last_modified = Column("url_last_modified", DateTime)
+    url_last_checked = Column("url_last_checked", DateTime)
     autoannounce_enabled = Column(
         "autoannounce_enabled", Boolean, default=True, server_default="t"
     )
     # ToDo: Look for all armed url watchers at startup and start them again
     url_watcher_armed = Column(
-        "watcher_armed", Boolean, default=False, server_default="f"
+        "url_watcher_armed", Boolean, default=False, server_default="f"
     )
 
     def __init__(
@@ -97,6 +99,20 @@ class XurPostSettings(Base):
 
 class LostSectorAutopostChannel(Base):
     __tablename__ = "lostsectorautopostchannel"
+    __mapper_args__ = {"eager_defaults": True}
+    id = Column("id", BigInteger, primary_key=True)
+    # Note: if server_id is -1 then this is a dm channel
+    server_id = Column("server_id", BigInteger)
+    enabled = Column("enabled", Boolean)
+
+    def __init__(self, id: int, server_id: int, enabled: bool):
+        self.id = id
+        self.server_id = server_id
+        self.enabled = enabled
+
+
+class XurAutopostChannel(Base):
+    __tablename__ = "xurautopostchannel"
     __mapper_args__ = {"eager_defaults": True}
     id = Column("id", BigInteger, primary_key=True)
     # Note: if server_id is -1 then this is a dm channel

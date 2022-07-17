@@ -354,3 +354,9 @@ async def get_lost_sector_text(date: dt.date = None) -> hikari.Embed:
         ).format(**format_dict),
         color=cfg.kyber_pink,
     ).set_image(ls_gfx_url)
+
+
+async def get_xur_text(gfx_url, post_url):
+    return hikari.Embed(
+        title="Testing testing", description="{}\n{}".format(gfx_url, post_url)
+    )
