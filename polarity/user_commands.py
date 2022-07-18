@@ -304,8 +304,8 @@ async def user_command(ctx: lightbulb.Context):
     redirected_text = url_regex.sub("{}", text)
     async with aiohttp.ClientSession() as session:
         for link in links:
-            async with session.get(link) as response:
-                redirected_links.append(str(response.url))
+            async with session.get(link, allow_redirects=False) as response:
+                redirected_links.append(str(response.headers["Location"]))
                 logging.info(
                     "Replacing link: {} with redirect: {}".format(
                         link, redirected_links[-1]
@@ -335,8 +335,8 @@ async def get_lost_sector_text(date: dt.date = None) -> hikari.Embed:
 
     # Follow the hyperlink to have the newest image embedded
     async with aiohttp.ClientSession() as session:
-        async with session.get(rot.shortlink_gfx) as response:
-            ls_gfx_url = str(response.url)
+        async with session.get(rot.shortlink_gfx, allow_redirects=False) as response:
+            ls_gfx_url = str(response.headers["Location"])
 
     format_dict = {
         "month": month[date.month],
