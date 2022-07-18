@@ -38,7 +38,7 @@ async def autoupdate_status():
     await bot.wait_for(lightbulb.events.LightbulbStartedEvent, timeout=None)
     await bot.update_presence(
         activity=hikari.Activity(
-            name="to {} servers".format(len(bot.cache.get_guilds_view())),
+            name="{} servers".format(len(bot.cache.get_guilds_view())),
             type=hikari.ActivityType.LISTENING,
         )
     )
