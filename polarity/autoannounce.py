@@ -25,7 +25,7 @@ from sqlalchemy import select, update
 
 from . import cfg, custom_checks
 from .user_commands import get_lost_sector_text, get_xur_text
-from .utils import _create_or_get, db_session
+from .utils import _create_or_get, db_session, operation_timer
 from .schemas import (
     LostSectorPostSettings,
     LostSectorAutopostChannel,
@@ -184,30 +184,20 @@ async def lost_sector_announcer(event: LostSectorSignal):
             channel_id_list = [channel[0].id for channel in channel_id_list]
 
     logging.info("Announcing lost sectors to {} channels".format(len(channel_id_list)))
-    start_time = dt.datetime.now()
-    embed = await get_lost_sector_text()
+    with operation_timer("Lost sector announce"):
+        embed = await get_lost_sector_text()
 
-    await asyncio.gather(
-        *[
-            _send_embed_if_textable_channel(
-                channel_id,
-                event,
-                embed,
-                LostSectorAutopostChannel,
-            )
-            for channel_id in channel_id_list
-        ]
-    )
-
-    end_time = dt.datetime.now()
-    time_delta = end_time - start_time
-    minutes = time_delta.seconds // 60
-    seconds = time_delta.seconds % 60
-    logging.info(
-        "Lost Sector announcements completed in {} minutes and {} seconds".format(
-            minutes, seconds
+        await asyncio.gather(
+            *[
+                _send_embed_if_textable_channel(
+                    channel_id,
+                    event,
+                    embed,
+                    LostSectorAutopostChannel,
+                )
+                for channel_id in channel_id_list
+            ]
         )
-    )
 
 
 async def xur_announcer(event: XurSignal):
@@ -224,30 +214,20 @@ async def xur_announcer(event: XurSignal):
             channel_id_list = [channel[0].id for channel in channel_id_list]
 
         logging.info("Announcing xur posts to {} channels".format(len(channel_id_list)))
-        start_time = dt.datetime.now()
-        embed = await get_xur_text(settings.url, settings.post_url)
+        with operation_timer("Xur announce"):
+            embed = await get_xur_text(settings.url, settings.post_url)
 
-        await asyncio.gather(
-            *[
-                _send_embed_if_textable_channel(
-                    channel_id,
-                    event,
-                    embed,
-                    XurAutopostChannel,
-                )
-                for channel_id in channel_id_list
-            ]
-        )
-
-        end_time = dt.datetime.now()
-        time_delta = end_time - start_time
-        minutes = time_delta.seconds // 60
-        seconds = time_delta.seconds % 60
-        logging.info(
-            "Xur announcement completed in {} minutes and {} seconds".format(
-                minutes, seconds
+            await asyncio.gather(
+                *[
+                    _send_embed_if_textable_channel(
+                        channel_id,
+                        event,
+                        embed,
+                        XurAutopostChannel,
+                    )
+                    for channel_id in channel_id_list
+                ]
             )
-        )
 
 
 @lightbulb.add_checks(

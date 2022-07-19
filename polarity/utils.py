@@ -13,7 +13,9 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
+import contextlib
 import datetime as dt
+import logging
 import re
 from typing import Tuple
 
@@ -58,6 +60,22 @@ async def _create_or_get(cls, id, **kwargs):
                 instance = cls(id, **kwargs)
                 session.add(instance)
     return instance
+
+
+@contextlib.contextmanager
+def operation_timer(op_name):
+    start_time = dt.datetime.now()
+    logging.info("{name} started".format(name=op_name))
+    yield
+    end_time = dt.datetime.now()
+    time_delta = end_time - start_time
+    minutes = time_delta.seconds // 60
+    seconds = time_delta.seconds % 60
+    logging.info(
+        "{name} finished in {mins} minutes and {secs} seconds".format(
+            name=op_name, mins=minutes, secs=seconds
+        )
+    )
 
 
 def weekend_period(today: dt.datetime = None) -> Tuple[dt.datetime, dt.datetime]:
