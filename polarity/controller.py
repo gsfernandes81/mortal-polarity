@@ -220,6 +220,8 @@ async def xur_rectify_announcement(ctx: lightbulb.Context):
     async with db_session() as session:
         async with session.begin():
             settings: XurPostSettings = await session.get(XurPostSettings, 0)
+            if settings is None:
+                await ctx.respond("Please enable xur autoposts before using this cmd")
             channel_record_list = (
                 await session.execute(
                     select(XurAutopostChannel).where(XurAutopostChannel.enabled == True)

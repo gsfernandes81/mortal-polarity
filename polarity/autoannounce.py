@@ -118,15 +118,14 @@ class XurSignal(BaseCustomEvent):
     ) -> None:
         if not await self.is_autoannounce_enabled():
             return
-        async with db_session() as session:
-            async with session.begin():
-                settings: XurPostSettings = await session.get(XurPostSettings, 0)
 
-            # Debug code
-            if cfg.test_env and cfg.trigger_without_url_update:
-                event.bot.dispatch(self)
+        settings: XurPostSettings = await _create_or_get(XurPostSettings, 0)
 
-            await settings.wait_for_url_update(session)
+        # Debug code
+        if cfg.test_env and cfg.trigger_without_url_update:
+            event.bot.dispatch(self)
+
+        await settings.wait_for_url_update()
         event.bot.dispatch(self)
 
     async def is_autoannounce_enabled(self):
@@ -135,6 +134,10 @@ class XurSignal(BaseCustomEvent):
 
     def arm(self) -> None:
         self.bot.listen()(self.conditional_weekend_reset_repeater)
+
+    async def wait_for_url_update(self):
+        settings: XurPostSettings = await _create_or_get(XurPostSettings, 0)
+        await settings.wait_for_url_update()
 
 
 async def _send_embed_if_textable_channel(

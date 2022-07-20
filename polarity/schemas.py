@@ -63,11 +63,13 @@ class XurPostSettings(BasePostSettings, Base):
     def __init__(
         self,
         id: int,
-        url: str,
+        url: str = cfg.defaults.xur.gfx_url,
+        post_url: str = cfg.defaults.xur.post_url,
         autoannounce_enabled: bool = True,
     ):
         self.id = id
         self.url = url
+        self.post_url = post_url
         self.autoannounce_enabled = autoannounce_enabled
 
     async def initialise_url_params(self):
@@ -87,20 +89,21 @@ class XurPostSettings(BasePostSettings, Base):
                 self.url_last_checked = dt.datetime.now()
                 self.url_last_modified = dt.datetime.now()
 
-    async def wait_for_url_update(self, db_session):
-        async with db_session.begin():
-            self.url_watcher_armed = True
-        check_interval = 10
-        async with aiohttp.ClientSession() as session:
-            while True:
-                async with session.get(self.url, allow_redirects=False) as resp:
-                    if resp.headers["Location"] != self.url_redirect_target:
-                        async with db_session.begin():
-                            self.url_redirect_target = resp.headers["Location"]
-                            self.url_last_modified = dt.datetime.now()
-                            self.url_watcher_armed = False
-                        return self
-                    await asyncio.sleep(check_interval)
+    async def wait_for_url_update(self):
+        async with db_session() as db_session_:
+            async with db_session_.begin():
+                self.url_watcher_armed = True
+            check_interval = 10
+            async with aiohttp.ClientSession() as session:
+                while True:
+                    async with session.get(self.url, allow_redirects=False) as resp:
+                        if resp.headers["Location"] != self.url_redirect_target:
+                            async with db_session_.begin():
+                                self.url_redirect_target = resp.headers["Location"]
+                                self.url_last_modified = dt.datetime.now()
+                                self.url_watcher_armed = False
+                            return self
+                        await asyncio.sleep(check_interval)
 
 
 @declarative_mixin
