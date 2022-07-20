@@ -13,12 +13,21 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
-import lightbulb
+import asyncio
+import logging
+from typing import List
 
-from polarity.schemas import LostSectorPostSettings, XurPostSettings
+import lightbulb
+from sqlalchemy import select
+import datetime as dt
+
+from polarity.schemas import LostSectorPostSettings, XurAutopostChannel, XurPostSettings
+from polarity.user_commands import get_xur_text
+from polarity.utils import operation_timer
 
 from . import cfg
 from .schemas import XurPostSettings, db_session
+from .autoannounce import _edit_embedded_message
 
 
 @lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
@@ -188,6 +197,58 @@ async def xur_post_url(ctx: lightbulb.Context):
             else:
                 settings.post_url = url
     await ctx.respond("Xur Post url updated to <{}>".format(url))
+
+
+@xur_announcements.child
+@lightbulb.option(
+    "change",
+    "What has changed",
+    type=str,
+    required=False,
+)
+@lightbulb.command(
+    "make_correction",
+    "Update a post, optionally with text saying what has changed",
+    auto_defer=True,
+    inherit_checks=True,
+)
+@lightbulb.implements(lightbulb.SlashSubCommand)
+async def xur_rectify_announcement(ctx: lightbulb.Context):
+    """Correct a mistake in the xur announcement
+    pull from urls again and update existing posts"""
+    change = ctx.options.change if ctx.options.change else ""
+    async with db_session() as session:
+        async with session.begin():
+            settings: XurPostSettings = await session.get(XurPostSettings, 0)
+            channel_record_list = (
+                await session.execute(
+                    select(XurAutopostChannel).where(XurAutopostChannel.enabled == True)
+                )
+            ).fetchall()
+            channel_record_list = (
+                [] if channel_record_list is None else channel_record_list
+            )
+            channel_record_list: List[XurAutopostChannel] = [
+                channel[0] for channel in channel_record_list
+            ]
+        logging.info("Correcting xur posts")
+        with operation_timer("Xur announce correction"):
+            embed = await get_xur_text(
+                settings.url,
+                settings.post_url,
+                change,
+            )
+            await asyncio.gather(
+                *[
+                    _edit_embedded_message(
+                        channel_record.last_msg_id,
+                        channel_record.id,
+                        ctx.bot,
+                        embed,
+                    )
+                    for channel_record in channel_record_list
+                ]
+            )
 
 
 def register_all(bot: lightbulb.BotApp) -> None:

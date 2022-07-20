@@ -140,7 +140,7 @@ async def _send_embed_if_textable_channel(
     channel_id: int,
     event: hikari.Event,
     embed: hikari.Embed,
-    channel_record,  # Must be the class of the channel, not an instance
+    channel_table,  # Must be the class of the channel, not an instance
 ) -> None:
     try:
         channel = await event.bot.rest.fetch_channel(channel_id)
@@ -149,25 +149,35 @@ async def _send_embed_if_textable_channel(
         if isinstance(channel, hikari.TextableChannel):
             async with db_session() as session:
                 async with session.begin():
-                    channel_record_instance = await session.get(
-                        channel_record, channel_id
-                    )
-                    channel_record_instance.last_msg_id = await channel.send(
-                        embed=embed
-                    )
+                    channel_record = await session.get(channel_table, channel_id)
+                    channel_record.last_msg_id = await channel.send(embed=embed)
     except (hikari.ForbiddenError, hikari.NotFoundError):
         logging.warning(
             "Channel {} not found or not messageable, disabling posts in {}".format(
-                channel_id, str(channel_record.__class__.__name__)
+                channel_id, str(channel_table.__class__.__name__)
             )
         )
         async with db_session() as session:
             async with session.begin():
                 await session.execute(
-                    update(channel_record)
-                    .where(channel_record.id == channel_id)
+                    update(channel_table)
+                    .where(channel_table.id == channel_id)
                     .values(enabled=False)
                 )
+
+
+async def _edit_embedded_message(
+    message_id: int,
+    channel_id: int,
+    bot: hikari.GatewayBot,
+    embed: hikari.Embed,
+) -> None:
+    try:
+        msg: hikari.Message = await bot.rest.fetch_message(channel_id, message_id)
+        if isinstance(msg, hikari.Message):
+            await msg.edit(content="", embed=embed)
+    except (hikari.ForbiddenError, hikari.NotFoundError):
+        logging.warning("Message {} not found or not editable".format(message_id))
 
 
 async def lost_sector_announcer(event: LostSectorSignal):

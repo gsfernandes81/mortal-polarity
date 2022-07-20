@@ -361,7 +361,7 @@ async def get_lost_sector_text(date: dt.date = None) -> hikari.Embed:
     ).set_image(ls_gfx_url)
 
 
-async def get_xur_text(gfx_url, post_url, date: dt.date = None):
+async def get_xur_text(gfx_url, post_url, correction: str = "", date: dt.date = None):
     if date is None:
         date = dt.datetime.now(tz=utc)
     start_date, end_date = weekend_period(date)
@@ -380,12 +380,16 @@ async def get_xur_text(gfx_url, post_url, date: dt.date = None):
         "post_url": post_url,
         "gfx_url": gfx_url,
     }
-    return hikari.Embed(
-        title=("Xur's Inventory and Location").format(**format_dict),
-        url=format_dict["post_url"],
-        description=(
-            "**Arrives:** {start_day_name}, {start_month} {start_day}\n"
-            + "**Departs:** {end_day_name}, {end_month} {end_day}"
-        ).format(**format_dict),
-        color=cfg.kyber_pink,
-    ).set_image(format_dict["gfx_url"])
+    return (
+        hikari.Embed(
+            title=("Xur's Inventory and Location").format(**format_dict),
+            url=format_dict["post_url"],
+            description=(
+                "**Arrives:** {start_day_name}, {start_month} {start_day}\n"
+                + "**Departs:** {end_day_name}, {end_month} {end_day}"
+            ).format(**format_dict),
+            color=cfg.kyber_pink,
+        )
+        .set_image(format_dict["gfx_url"])
+        .set_footer(correction)
+    )
