@@ -110,4 +110,13 @@ def day_period(today: dt.datetime = None) -> Tuple[dt.datetime, dt.datetime]:
 async def follow_link_single_step(url: str) -> str:
     async with aiohttp.ClientSession() as session:
         async with session.get(url, allow_redirects=False) as resp:
-            return resp.headers["Location"]
+            try:
+                return resp.headers["Location"]
+            except KeyError:
+                # If we can't find the location key, warn and return the
+                # provided url itself
+                logging.warning(
+                    "Could not find redirect for url "
+                    + "{}, returning as is".format(url)
+                )
+                return url
