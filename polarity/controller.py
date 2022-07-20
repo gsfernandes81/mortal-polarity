@@ -233,6 +233,7 @@ async def xur_rectify_announcement(ctx: lightbulb.Context):
             ]
         logging.info("Correcting xur posts")
         with operation_timer("Xur announce correction"):
+            await ctx.respond("Correcting posts now")
             embed = await get_xur_text(
                 settings.url,
                 settings.post_url,
@@ -249,6 +250,7 @@ async def xur_rectify_announcement(ctx: lightbulb.Context):
                     for channel_record in channel_record_list
                 ]
             )
+            await ctx.edit_last_response("Posts corrected")
 
 
 @xur_announcements.child
