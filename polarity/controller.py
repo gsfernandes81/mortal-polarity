@@ -111,7 +111,7 @@ async def xur_autoposts(ctx: lightbulb.Context):
         async with session.begin():
             settings = await session.get(XurPostSettings, 0)
             if settings is None:
-                settings = XurPostSettings(0, option)
+                settings = XurPostSettings(0, autoannounce_enabled=option)
                 session.add(settings)
             else:
                 settings.autoannounce_enabled = option
