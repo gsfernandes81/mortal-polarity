@@ -27,7 +27,7 @@ from polarity.utils import operation_timer
 
 from . import cfg
 from .schemas import XurPostSettings, db_session
-from .autoannounce import _edit_embedded_message
+from .autoannounce import XurSignal, _edit_embedded_message
 
 
 @lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
@@ -249,6 +249,19 @@ async def xur_rectify_announcement(ctx: lightbulb.Context):
                     for channel_record in channel_record_list
                 ]
             )
+
+
+@xur_announcements.child
+@lightbulb.command(
+    "manual_announce",
+    "Trigger an announcement manually",
+    auto_defer=True,
+    inherit_checks=True,
+)
+@lightbulb.implements(lightbulb.SlashSubCommand)
+async def manual_xur_announce(ctx: lightbulb.Context):
+    ctx.bot.dispatch(XurSignal(ctx.bot))
+    await ctx.respond("Xur announcements being sent out now")
 
 
 def register_all(bot: lightbulb.BotApp) -> None:
