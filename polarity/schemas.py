@@ -18,15 +18,21 @@ import datetime as dt
 
 import aiohttp
 from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String
+from sqlalchemy.orm import declarative_mixin, declared_attr
 from sqlalchemy.sql.schema import Column
 
 from . import cfg
 from .utils import Base, db_engine, db_session
 
 
-class LostSectorPostSettings(Base):
-    __tablename__ = "lostsectorpostsettings"
+@declarative_mixin
+class BasePostSettings:
+    @declared_attr
+    def __tablename__(cls):
+        return cls.__name__.lower()
+
     __mapper_args__ = {"eager_defaults": True}
+
     id = Column("id", Integer, primary_key=True)
     autoannounce_enabled = Column(
         "autoannounce_enabled", Boolean, default=True, server_default="t"
@@ -37,19 +43,18 @@ class LostSectorPostSettings(Base):
         self.autoannounce_enabled = autoannounce_enabled
 
 
-class XurPostSettings(Base):
-    __tablename__ = "xurpostsettings"
-    __mapper_args__ = {"eager_defaults": True}
-    id = Column("id", Integer, primary_key=True)
-    # url is the infographic url
+class LostSectorPostSettings(BasePostSettings, Base):
+    pass
+
+
+class XurPostSettings(BasePostSettings, Base):
+    # url: the infographic url
     url = Column("url", String, nullable=False, default=cfg.defaults.xur.gfx_url)
+    # post_url: hyperlink for the post title
     post_url = Column("post_url", String, default=cfg.defaults.xur.post_url)
     url_redirect_target = Column("url_redirect_target", String)
     url_last_modified = Column("url_last_modified", DateTime)
     url_last_checked = Column("url_last_checked", DateTime)
-    autoannounce_enabled = Column(
-        "autoannounce_enabled", Boolean, default=True, server_default="t"
-    )
     # ToDo: Look for all armed url watchers at startup and start them again
     url_watcher_armed = Column(
         "url_watcher_armed", Boolean, default=False, server_default="f"
@@ -98,9 +103,14 @@ class XurPostSettings(Base):
                     await asyncio.sleep(check_interval)
 
 
-class LostSectorAutopostChannel(Base):
-    __tablename__ = "lostsectorautopostchannel"
+@declarative_mixin
+class BaseChannelRecord:
+    @declared_attr
+    def __tablename__(cls):
+        return cls.__name__.lower()
+
     __mapper_args__ = {"eager_defaults": True}
+
     id = Column("id", BigInteger, primary_key=True)
     # Note: if server_id is -1 then this is a dm channel
     server_id = Column("server_id", BigInteger)
@@ -113,19 +123,12 @@ class LostSectorAutopostChannel(Base):
         self.enabled = enabled
 
 
-class XurAutopostChannel(Base):
-    __tablename__ = "xurautopostchannel"
-    __mapper_args__ = {"eager_defaults": True}
-    id = Column("id", BigInteger, primary_key=True)
-    # Note: if server_id is -1 then this is a dm channel
-    server_id = Column("server_id", BigInteger)
-    last_msg_id = Column("last_msg_id", BigInteger)
-    enabled = Column("enabled", Boolean)
+class LostSectorAutopostChannel(BaseChannelRecord, Base):
+    pass
 
-    def __init__(self, id: int, server_id: int, enabled: bool):
-        self.id = id
-        self.server_id = server_id
-        self.enabled = enabled
+
+class XurAutopostChannel(BaseChannelRecord, Base):
+    pass
 
 
 class Commands(Base):
