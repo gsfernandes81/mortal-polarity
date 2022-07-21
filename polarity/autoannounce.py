@@ -258,63 +258,12 @@ async def autopost_cmd_group(ctx: lightbulb.Context) -> None:
     )
 
 
-def make_autoannounce_control_user_command(channel_table):
-    # Uses a LostSectorAutopostChannel or XurAutopostChannel like table
-    # to make a command for the user to be able to control autoposts in their
-    # server
-    cls_name = channel_table.__name__
-    name_list = re.findall("[A-Z][^A-Z]*", cls_name)
-    name = " ".join(name_list[:-2])
-    cmd_name = "".join(name_list[:-2])
-
-    # Function creation
-    @autopost_cmd_group.child
-    @lightbulb.option(
-        "option",
-        "Enabled or disabled",
-        type=str,
-        choices=["Enable", "Disable"],
-        required=True,
-    )
-    @lightbulb.command(
-        cmd_name.lower(),
-        "Lost sector auto posts",
-        auto_defer=True,
-        guilds=cfg.kyber_discord_server_id,
-        inherit_checks=True,
-    )
-    @lightbulb.implements(lightbulb.SlashSubCommand)
-    async def generic_autopost_user_side_controller(ctx: lightbulb.Context) -> None:
-        channel_id: int = ctx.channel_id
-        server_id: int = ctx.guild_id if ctx.guild_id is not None else -1
-        option: bool = True if ctx.options.option.lower() == "enable" else False
-        bot = ctx.bot
-        if await _bot_has_message_perms(bot, channel_id):
-            async with db_session() as session:
-                async with session.begin():
-                    channel = await session.get(channel_table, channel_id)
-                    if channel is None:
-                        channel = channel_table(channel_id, server_id, option)
-                        session.add(channel)
-                    else:
-                        channel.enabled = option
-            await ctx.respond(
-                name + " autoposts {}".format("enabled" if option else "disabled")
-            )
-        else:
-            await ctx.respond(
-                'The bot does not have the "Send Messages" or the'
-                + ' "Send Messages in Threads" permission here'
-            )
-
-    # End of function creation
-    return generic_autopost_user_side_controller
+lost_sector_auto = LostSectorAutopostChannel.make_autopost_ctrl_usr_cmd(
+    autopost_cmd_group
+)
 
 
-lost_sector_auto = make_autoannounce_control_user_command(LostSectorAutopostChannel)
-
-
-xur_auto = make_autoannounce_control_user_command(XurAutopostChannel)
+xur_auto = XurAutopostChannel.make_autopost_ctrl_usr_cmd(autopost_cmd_group)
 
 
 @autopost_cmd_group.set_error_handler
@@ -332,34 +281,6 @@ def _wire_listeners(bot: lightbulb.BotApp) -> None:
     """Connects all listener coroutines to the bot"""
     for handler in [lost_sector_announcer, xur_announcer]:
         bot.listen()(handler)
-
-
-async def _bot_has_message_perms(
-    bot: lightbulb.BotApp, channel: Union[hikari.TextableChannel, int]
-) -> bool:
-    if not isinstance(channel, hikari.TextableChannel):
-        channel = await bot.rest.fetch_channel(channel)
-    if isinstance(channel, hikari.TextableChannel):
-        if isinstance(channel, hikari.TextableGuildChannel):
-            guild = await channel.fetch_guild()
-            self_member = await bot.rest.fetch_member(guild, bot.get_me())
-            perms = lightbulb.utils.permissions_in(channel, self_member)
-            # Check if we have the send messages permission in the channel
-            # Refer to hikari.Permissions to see how / why this works
-            # Note: Hikari doesn't recognize threads
-            # Channel types 10, 11, 12 and 15 are thread types as specified in:
-            # https://discord.com/developers/docs/resources/channel#channel-object-channel-types
-            # If the channel is a thread, we need to check for the SEND_MESSAGES_IN_THREADS perm
-            if channel.type in [10, 11, 12, 15]:
-                return (
-                    hikari.Permissions.SEND_MESSAGES_IN_THREADS & perms
-                ) == hikari.Permissions.SEND_MESSAGES_IN_THREADS
-            else:
-                return (
-                    hikari.Permissions.SEND_MESSAGES & perms
-                ) == hikari.Permissions.SEND_MESSAGES
-        else:
-            return True
 
 
 async def arm(bot: lightbulb.BotApp) -> None:
