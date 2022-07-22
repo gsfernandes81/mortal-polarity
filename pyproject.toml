@@ -15,12 +15,13 @@ aiofiles = "*"
 alembic = "*"
 SQLAlchemy = "^1.4.35"
 hikari = { extras = ["speedups"], version = "^2.0.0-alpha.109" }
-hikari-lightbulb = "^2.2.2"
+hikari-lightbulb = "^2.2"
 uvloop = "^0.16.0"
 sector_accounting = { git = "https://github.com/gs729/sector_accounting.git", rev = "b6059f4" }
 requests = "^2.28.0"
 APScheduler = "^3.9.1"
 aiohttp = "^3.8.1"
+lightbulb-ext-wtf = { git = "https://github.com/tandemdude/lightbulb-ext-wtf.git" }
 
 [tool.poetry.dev-dependencies]
 pyflakes = "*"
