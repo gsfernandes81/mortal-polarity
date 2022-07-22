@@ -15,6 +15,7 @@
 
 import asyncio
 import datetime as dt
+import functools
 import re
 from typing import Union
 
@@ -130,57 +131,59 @@ class BaseChannelRecord:
         self.enabled = enabled
 
     @classmethod
-    def make_autopost_ctrl_usr_cmd(cls, cmd_group: lightbulb.SlashCommandGroup):
-        # Uses a LostSectorAutopostChannel or XurAutopostChannel like table
-        # to make a command for the user to be able to control autoposts in their
-        # server
-        cls_name = cls.__name__
-        name_list = re.findall("[A-Z][^A-Z]*", cls_name)
-        name = " ".join(name_list[:-2])
-        cmd_name = "".join(name_list[:-2])
-
-        # Function creation
-        @cmd_group.child
-        @lightbulb.option(
-            "option",
-            "Enabled or disabled",
-            type=str,
-            choices=["Enable", "Disable"],
-            required=True,
-        )
-        @lightbulb.command(
-            cmd_name.lower(),
-            "Lost sector auto posts",
-            auto_defer=True,
-            guilds=cfg.kyber_discord_server_id,
-            inherit_checks=True,
-        )
-        @lightbulb.implements(lightbulb.SlashSubCommand)
-        async def generic_autopost_user_side_controller(ctx: lightbulb.Context) -> None:
-            channel_id: int = ctx.channel_id
-            server_id: int = ctx.guild_id if ctx.guild_id is not None else -1
-            option: bool = True if ctx.options.option.lower() == "enable" else False
-            bot = ctx.bot
-            if await cls._check_bot_has_message_perms(bot, channel_id):
-                async with db_session() as session:
-                    async with session.begin():
-                        channel = await session.get(cls, channel_id)
-                        if channel is None:
-                            channel = cls(channel_id, server_id, option)
-                            session.add(channel)
-                        else:
-                            channel.enabled = option
-                await ctx.respond(
-                    name + " autoposts {}".format("enabled" if option else "disabled")
+    def register_command(cls, cmd_group: lightbulb.SlashCommandGroup):
+        cmd_group.child(
+            lightbulb.option(
+                "option",
+                "Enabled or disabled",
+                type=str,
+                choices=["Enable", "Disable"],
+                required=True,
+            )(
+                lightbulb.command(
+                    "".join(re.findall("[A-Z][^A-Z]*", cls.__name__)[:-2]).lower(),
+                    "Lost sector auto posts",
+                    auto_defer=True,
+                    guilds=cfg.kyber_discord_server_id,
+                    inherit_checks=True,
+                )(
+                    lightbulb.implements(lightbulb.SlashSubCommand)(
+                        functools.partial(cls.autopost_ctrl_usr_cmd, cls)
+                    )
                 )
-            else:
-                await ctx.respond(
-                    'The bot does not have the "Send Messages" or the'
-                    + ' "Send Messages in Threads" permission here'
-                )
+            )
+        )
 
-        # End of function creation
-        return generic_autopost_user_side_controller
+    # Note this is a classmethod with cls supplied by functools.partial
+    # from within the cls.register_command function
+    @staticmethod
+    async def autopost_ctrl_usr_cmd(
+        # Command for the user to be able to control autoposts in their server
+        cls,
+        ctx: lightbulb.Context,
+    ) -> None:
+        channel_id: int = ctx.channel_id
+        server_id: int = ctx.guild_id if ctx.guild_id is not None else -1
+        option: bool = True if ctx.options.option.lower() == "enable" else False
+        bot = ctx.bot
+        if await cls._check_bot_has_message_perms(bot, channel_id):
+            async with db_session() as session:
+                async with session.begin():
+                    channel = await session.get(cls, channel_id)
+                    if channel is None:
+                        channel = cls(channel_id, server_id, option)
+                        session.add(channel)
+                    else:
+                        channel.enabled = option
+            await ctx.respond(
+                " ".join(re.findall("[A-Z][^A-Z]*", cls.__name__)[:-2])
+                + " autoposts {}".format("enabled" if option else "disabled")
+            )
+        else:
+            await ctx.respond(
+                'The bot does not have the "Send Messages" or the'
+                + ' "Send Messages in Threads" permission here'
+            )
 
     @staticmethod
     async def _check_bot_has_message_perms(

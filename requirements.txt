@@ -24,6 +24,7 @@ gspread==5.4.0; python_full_version >= "3.10.1" and python_full_version < "3.11.
 hikari-lightbulb==2.2.2; python_full_version >= "3.8.0" and python_version < "3.11"
 hikari==2.0.0.dev109; python_full_version >= "3.8.0" and python_version < "3.11"
 idna==3.3; python_version >= "3.7" and python_version < "3.11" and python_full_version >= "3.10.1" and python_full_version < "3.11.0"
+lightbulb-ext-wtf @ git+https://github.com/tandemdude/lightbulb-ext-wtf.git@master ; python_full_version >= "3.8.0" and python_version < "3.11"
 mako==1.2.0; python_version >= "3.7"
 markupsafe==2.1.1; python_version >= "3.7"
 multidict==6.0.2; python_full_version >= "3.8.0" and python_version < "3.11" and python_version >= "3.7"
