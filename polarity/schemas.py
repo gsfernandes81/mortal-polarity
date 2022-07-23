@@ -16,18 +16,29 @@
 import asyncio
 import datetime as dt
 import functools
+import logging
 import re
-from typing import Union
+from calendar import month_name as month
+from typing import Type, Union
 
 import aiohttp
 import hikari
 import lightbulb
-from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String
+from pytz import utc
+from sector_accounting import Rotation
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String, select
 from sqlalchemy.orm import declarative_mixin, declared_attr
 from sqlalchemy.sql.schema import Column
 
 from . import cfg
-from .utils import Base, db_engine, db_session
+from .utils import (
+    Base,
+    _send_embed_if_textable_channel,
+    db_session,
+    follow_link_single_step,
+    operation_timer,
+    weekend_period,
+)
 
 
 @declarative_mixin
@@ -47,9 +58,49 @@ class BasePostSettings:
         self.id = id
         self.autoannounce_enabled = autoannounce_enabled
 
+    async def get_announce_embed(self) -> hikari.Embed:
+        pass
+
 
 class LostSectorPostSettings(BasePostSettings, Base):
-    pass
+    async def get_announce_embed(self, date: dt.date = None) -> hikari.Embed:
+        buffer = 1  # Minute
+        if date is None:
+            date = dt.datetime.now(tz=utc) - dt.timedelta(hours=16, minutes=60 - buffer)
+        else:
+            date = date + dt.timedelta(minutes=buffer)
+        rot = Rotation.from_gspread_url(
+            cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=buffer
+        )()
+
+        # Follow the hyperlink to have the newest image embedded
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                rot.shortlink_gfx, allow_redirects=False
+            ) as response:
+                ls_gfx_url = str(response.headers["Location"])
+
+        format_dict = {
+            "month": month[date.month],
+            "day": date.day,
+            "sector": rot,
+            "ls_url": ls_gfx_url,
+        }
+
+        return hikari.Embed(
+            title="**Daily Lost Sector for {month} {day}**".format(**format_dict),
+            description=(
+                "<:LS:849727805994565662> **{sector.name}**:\n\n"
+                + "• Exotic Reward (If Solo): {sector.reward}\n"
+                + "• Champs: {sector.champions}\n"
+                + "• Shields: {sector.shields}\n"
+                + "• Burn: {sector.burn}\n"
+                + "• Modifiers: {sector.modifiers}\n"
+                + "\n"
+                + "**More Info:** <https://kyber3000.com/LS>"
+            ).format(**format_dict),
+            color=cfg.kyber_pink,
+        ).set_image(ls_gfx_url)
 
 
 class XurPostSettings(BasePostSettings, Base):
@@ -97,6 +148,7 @@ class XurPostSettings(BasePostSettings, Base):
     async def wait_for_url_update(self):
         async with db_session() as db_session_:
             async with db_session_.begin():
+                db_session_.add(self)
                 self.url_watcher_armed = True
             check_interval = 10
             async with aiohttp.ClientSession() as session:
@@ -104,11 +156,48 @@ class XurPostSettings(BasePostSettings, Base):
                     async with session.get(self.url, allow_redirects=False) as resp:
                         if resp.headers["Location"] != self.url_redirect_target:
                             async with db_session_.begin():
+                                db_session_.add(self)
                                 self.url_redirect_target = resp.headers["Location"]
                                 self.url_last_modified = dt.datetime.now()
                                 self.url_watcher_armed = False
                             return self
                         await asyncio.sleep(check_interval)
+
+    async def get_announce_embed(
+        self, correction: str = "", date: dt.date = None
+    ) -> hikari.Embed:
+        # Use the current date if none is specified
+        if date is None:
+            date = dt.datetime.now(tz=utc)
+        # Get the period of validity for this message
+        start_date, end_date = weekend_period(date)
+        # Follow urls 1 step into redirects
+        gfx_url = await follow_link_single_step(self.url)
+        post_url = await follow_link_single_step(self.post_url)
+
+        format_dict = {
+            "start_month": month[start_date.month],
+            "end_month": month[end_date.month],
+            "start_day": start_date.day,
+            "start_day_name": start_date.strftime("%A"),
+            "end_day": end_date.day,
+            "end_day_name": end_date.strftime("%A"),
+            "post_url": post_url,
+            "gfx_url": gfx_url,
+        }
+        return (
+            hikari.Embed(
+                title=("Xur's Inventory and Location").format(**format_dict),
+                url=format_dict["post_url"],
+                description=(
+                    "**Arrives:** {start_day_name}, {start_month} {start_day}\n"
+                    + "**Departs:** {end_day_name}, {end_month} {end_day}"
+                ).format(**format_dict),
+                color=cfg.kyber_pink,
+            )
+            .set_image(format_dict["gfx_url"])
+            .set_footer(correction)
+        )
 
 
 @declarative_mixin
@@ -125,13 +214,21 @@ class BaseChannelRecord:
     last_msg_id = Column("last_msg_id", BigInteger)
     enabled = Column("enabled", Boolean)
 
+    # Settings object for this channel type
+    settings_records: Type[BasePostSettings]
+
     def __init__(self, id: int, server_id: int, enabled: bool):
         self.id = id
         self.server_id = server_id
         self.enabled = enabled
 
     @classmethod
-    def register_command(cls, cmd_group: lightbulb.SlashCommandGroup):
+    def register_with_bot(
+        cls,
+        bot: lightbulb.BotApp,
+        cmd_group: lightbulb.SlashCommandGroup,
+        announce_event: Type[hikari.Event],
+    ):
         cmd_group.child(
             lightbulb.option(
                 "option",
@@ -153,9 +250,10 @@ class BaseChannelRecord:
                 )
             )
         )
+        bot.listen(announce_event)(functools.partial(cls.announcer, cls))
 
     # Note this is a classmethod with cls supplied by functools.partial
-    # from within the cls.register_command function
+    # from within the cls.register_with_bot function
     @staticmethod
     async def autopost_ctrl_usr_cmd(
         # Command for the user to be able to control autoposts in their server
@@ -213,13 +311,48 @@ class BaseChannelRecord:
             else:
                 return True
 
+    # Note this is a classmethod with cls supplied by functools.partial
+    # from within the cls.register_with_bot function
+    @staticmethod
+    async def announcer(cls, event):
+        async with db_session() as session:
+            async with session.begin():
+                settings: BasePostSettings = await session.get(cls.settings_records, 0)
+            async with session.begin():
+                channel_id_list = (
+                    await session.execute(select(cls).where(cls.enabled == True))
+                ).fetchall()
+                channel_id_list = [] if channel_id_list is None else channel_id_list
+                channel_id_list = [channel[0].id for channel in channel_id_list]
+
+            logging.info(
+                # Note, need to implement regex to specify which announcement
+                # is being carried out in these logs
+                "Announcing {} posts to {} channels".format(
+                    "base", len(channel_id_list)
+                )
+            )
+            with operation_timer("Base announce"):
+                embed = await settings.get_announce_embed()
+                await asyncio.gather(
+                    *[
+                        _send_embed_if_textable_channel(
+                            channel_id,
+                            event,
+                            embed,
+                            cls,
+                        )
+                        for channel_id in channel_id_list
+                    ]
+                )
+
 
 class LostSectorAutopostChannel(BaseChannelRecord, Base):
-    pass
+    settings_records: Type[BasePostSettings] = LostSectorPostSettings
 
 
 class XurAutopostChannel(BaseChannelRecord, Base):
-    pass
+    settings_records: Type[BasePostSettings] = XurPostSettings
 
 
 class Commands(Base):

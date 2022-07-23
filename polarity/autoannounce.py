@@ -13,16 +13,11 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio
-import datetime as dt
 import logging
-from typing import Union
 
 import hikari
 import lightbulb
-import re
 from aiohttp import web
-from sqlalchemy import select, update
 
 from . import cfg, custom_checks
 from .schemas import (
@@ -31,8 +26,7 @@ from .schemas import (
     XurAutopostChannel,
     XurPostSettings,
 )
-from .user_commands import get_lost_sector_text, get_xur_text
-from .utils import _create_or_get, db_session, operation_timer
+from .utils import _create_or_get
 
 app = web.Application()
 
@@ -140,110 +134,6 @@ class XurSignal(BaseCustomEvent):
         await settings.wait_for_url_update()
 
 
-async def _send_embed_if_textable_channel(
-    channel_id: int,
-    event: hikari.Event,
-    embed: hikari.Embed,
-    channel_table,  # Must be the class of the channel, not an instance
-) -> None:
-    try:
-        channel = await event.bot.rest.fetch_channel(channel_id)
-        # Can add hikari.GuildNewsChannel for announcement channel support
-        # could be useful if we automate more stuff for Kyber
-        if isinstance(channel, hikari.TextableChannel):
-            async with db_session() as session:
-                async with session.begin():
-                    channel_record = await session.get(channel_table, channel_id)
-                    channel_record.last_msg_id = await channel.send(embed=embed)
-    except (hikari.ForbiddenError, hikari.NotFoundError):
-        logging.warning(
-            "Channel {} not found or not messageable, disabling posts in {}".format(
-                channel_id, str(channel_table.__class__.__name__)
-            )
-        )
-        async with db_session() as session:
-            async with session.begin():
-                await session.execute(
-                    update(channel_table)
-                    .where(channel_table.id == channel_id)
-                    .values(enabled=False)
-                )
-
-
-async def _edit_embedded_message(
-    message_id: int,
-    channel_id: int,
-    bot: hikari.GatewayBot,
-    embed: hikari.Embed,
-) -> None:
-    try:
-        msg: hikari.Message = await bot.rest.fetch_message(channel_id, message_id)
-        if isinstance(msg, hikari.Message):
-            await msg.edit(content="", embed=embed)
-    except (hikari.ForbiddenError, hikari.NotFoundError):
-        logging.warning("Message {} not found or not editable".format(message_id))
-
-
-async def lost_sector_announcer(event: LostSectorSignal):
-    async with db_session() as session:
-        async with session.begin():
-            channel_id_list = (
-                await session.execute(
-                    select(LostSectorAutopostChannel).where(
-                        LostSectorAutopostChannel.enabled == True
-                    )
-                )
-            ).fetchall()
-            channel_id_list = [] if channel_id_list is None else channel_id_list
-            channel_id_list = [channel[0].id for channel in channel_id_list]
-
-    logging.info("Announcing lost sectors to {} channels".format(len(channel_id_list)))
-    with operation_timer("Lost sector announce"):
-        embed = await get_lost_sector_text()
-
-        await asyncio.gather(
-            *[
-                _send_embed_if_textable_channel(
-                    channel_id,
-                    event,
-                    embed,
-                    LostSectorAutopostChannel,
-                )
-                for channel_id in channel_id_list
-            ]
-        )
-
-
-async def xur_announcer(event: XurSignal):
-    async with db_session() as session:
-        async with session.begin():
-            settings: XurPostSettings = await session.get(XurPostSettings, 0)
-        async with session.begin():
-            channel_id_list = (
-                await session.execute(
-                    select(XurAutopostChannel).where(XurAutopostChannel.enabled == True)
-                )
-            ).fetchall()
-            channel_id_list = [] if channel_id_list is None else channel_id_list
-            channel_id_list = [channel[0].id for channel in channel_id_list]
-
-        logging.info("Announcing xur posts to {} channels".format(len(channel_id_list)))
-        with operation_timer("Xur announce"):
-            embed = await get_xur_text(settings.url, settings.post_url)
-
-            await asyncio.gather(
-                *[
-                    _send_embed_if_textable_channel(
-                        channel_id,
-                        event,
-                        embed,
-                        XurAutopostChannel,
-                    )
-                    for channel_id in channel_id_list
-                ]
-            )
-
-
 @lightbulb.add_checks(
     lightbulb.checks.dm_only
     | custom_checks.has_guild_permissions(hikari.Permissions.ADMINISTRATOR)
@@ -269,12 +159,6 @@ async def announcements_error_handler(
     )
 
 
-def _wire_listeners(bot: lightbulb.BotApp) -> None:
-    """Connects all listener coroutines to the bot"""
-    for handler in [lost_sector_announcer, xur_announcer]:
-        bot.listen()(handler)
-
-
 async def arm(bot: lightbulb.BotApp) -> None:
     # Arm all signals
     DailyResetSignal(bot).arm()
@@ -282,12 +166,14 @@ async def arm(bot: lightbulb.BotApp) -> None:
     WeekendResetSignal(bot).arm()
     LostSectorSignal(bot).arm()
     XurSignal(bot).arm()
-    XurAutopostChannel.register_command(autopost_cmd_group)
-    LostSectorAutopostChannel.register_command(autopost_cmd_group)
-    # Connect listeners to the bot
-    _wire_listeners(bot)
+
     # Connect commands
+    LostSectorAutopostChannel.register_with_bot(
+        bot, autopost_cmd_group, LostSectorSignal
+    )
+    XurAutopostChannel.register_with_bot(bot, autopost_cmd_group, XurSignal)
     bot.command(autopost_cmd_group)
+
     # Start the web server for periodic signals from apscheduler
     runner = web.AppRunner(app)
     await runner.setup()

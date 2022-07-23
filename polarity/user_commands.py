@@ -15,26 +15,15 @@
 
 # End user facing command implementations for the bot
 
-import datetime as dt
 import logging
-from calendar import month_name as month
 
 import aiohttp
 import hikari
 import lightbulb
-from pytz import utc
-from sector_accounting import Rotation
 from sqlalchemy.sql.expression import delete, select
 
-from . import cfg
-from .utils import (
-    RefreshCmdListEvent,
-    url_regex,
-    weekend_period,
-    follow_link_single_step,
-)
-from .schemas import db_session
-from .schemas import Commands
+from . import cfg, schemas
+from .utils import RefreshCmdListEvent, db_session, url_regex
 
 command_registry = {}
 
@@ -60,7 +49,9 @@ async def add_command(ctx: lightbulb.Context) -> None:
 
     async with db_session() as session:
         async with session.begin():
-            additional_commands = (await session.execute(select(Commands))).fetchall()
+            additional_commands = (
+                await session.execute(select(schemas.Commands))
+            ).fetchall()
             additional_commands = (
                 [] if additional_commands is None else additional_commands
             )
@@ -70,7 +61,7 @@ async def add_command(ctx: lightbulb.Context) -> None:
                 await ctx.respond("A command with that name already exists")
                 return
 
-            command = Commands(
+            command = schemas.Commands(
                 name,
                 description,
                 text,
@@ -113,7 +104,9 @@ async def del_command(ctx: lightbulb.Context) -> None:
             await ctx.respond("No such command found")
         else:
             async with session.begin():
-                await session.execute(delete(Commands).where(Commands.name == name))
+                await session.execute(
+                    delete(schemas.Commands).where(schemas.Commands.name == name)
+                )
                 bot.remove_command(command_to_delete)
                 await ctx.respond("{} command deleted".format(name))
     # Trigger a refresh of the choices in the delete command
@@ -159,9 +152,11 @@ async def edit_command(ctx: lightbulb.Context):
     bot = ctx.bot
     async with db_session() as session:
         async with session.begin():
-            command: Commands = (
+            command: schemas.Commands = (
                 await session.execute(
-                    select(Commands).where(Commands.name == ctx.options.name.lower())
+                    select(schemas.Commands).where(
+                        schemas.Commands.name == ctx.options.name.lower()
+                    )
                 )
             ).fetchone()[0]
 
@@ -231,7 +226,12 @@ async def edit_command(ctx: lightbulb.Context):
 @lightbulb.command("lstoday", "Find out about today's lost sector", auto_defer=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def ls_command(ctx: lightbulb.Context):
-    await ctx.respond(embed=await get_lost_sector_text())
+    async with db_session() as session:
+        async with session.begin():
+            settings: schemas.XurPostSettings = session.get(
+                schemas.XurAutopostChannel, 0
+            )
+    await ctx.respond(embed=await settings.get_announce_embed())
 
 
 async def command_options_updater(event: RefreshCmdListEvent):
@@ -247,7 +247,7 @@ async def register_commands_on_startup(event: hikari.StartingEvent):
     logging.info("Registering commands")
     async with db_session() as session:
         async with session.begin():
-            command_list = (await session.execute(select(Commands))).fetchall()
+            command_list = (await session.execute(select(schemas.Commands))).fetchall()
             command_list = [] if command_list is None else command_list
             command_list = [command[0] for command in command_list]
             for command in command_list:
@@ -293,7 +293,9 @@ async def user_command(ctx: lightbulb.Context):
         async with session.begin():
             command = (
                 await session.execute(
-                    select(Commands).where(Commands.name == ctx.command.name)
+                    select(schemas.Commands).where(
+                        schemas.Commands.name == ctx.command.name
+                    )
                 )
             ).fetchone()[0]
     text = command.response.strip()
@@ -316,80 +318,8 @@ async def user_command(ctx: lightbulb.Context):
     await ctx.respond(redirected_text)
 
 
-def db_command_to_lb_user_command(command: Commands):
+def db_command_to_lb_user_command(command: schemas.Commands):
     # Needs an open db session watching command
     return lightbulb.command(command.name, command.description, auto_defer=True)(
         lightbulb.implements(lightbulb.SlashCommand)(user_command)
-    )
-
-
-async def get_lost_sector_text(date: dt.date = None) -> hikari.Embed:
-    buffer = 1  # Minute
-    if date is None:
-        date = dt.datetime.now(tz=utc) - dt.timedelta(hours=16, minutes=60 - buffer)
-    else:
-        date = date + dt.timedelta(minutes=buffer)
-    rot = Rotation.from_gspread_url(
-        cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=buffer
-    )()
-
-    # Follow the hyperlink to have the newest image embedded
-    async with aiohttp.ClientSession() as session:
-        async with session.get(rot.shortlink_gfx, allow_redirects=False) as response:
-            ls_gfx_url = str(response.headers["Location"])
-
-    format_dict = {
-        "month": month[date.month],
-        "day": date.day,
-        "sector": rot,
-        "ls_url": ls_gfx_url,
-    }
-
-    return hikari.Embed(
-        title="**Daily Lost Sector for {month} {day}**".format(**format_dict),
-        description=(
-            "<:LS:849727805994565662> **{sector.name}**:\n\n"
-            + "• Exotic Reward (If Solo): {sector.reward}\n"
-            + "• Champs: {sector.champions}\n"
-            + "• Shields: {sector.shields}\n"
-            + "• Burn: {sector.burn}\n"
-            + "• Modifiers: {sector.modifiers}\n"
-            + "\n"
-            + "**More Info:** <https://kyber3000.com/LS>"
-        ).format(**format_dict),
-        color=cfg.kyber_pink,
-    ).set_image(ls_gfx_url)
-
-
-async def get_xur_text(gfx_url, post_url, correction: str = "", date: dt.date = None):
-    if date is None:
-        date = dt.datetime.now(tz=utc)
-    start_date, end_date = weekend_period(date)
-
-    # Follow urls 1 step into redirects
-    gfx_url = await follow_link_single_step(gfx_url)
-    post_url = await follow_link_single_step(post_url)
-
-    format_dict = {
-        "start_month": month[start_date.month],
-        "end_month": month[end_date.month],
-        "start_day": start_date.day,
-        "start_day_name": start_date.strftime("%A"),
-        "end_day": end_date.day,
-        "end_day_name": end_date.strftime("%A"),
-        "post_url": post_url,
-        "gfx_url": gfx_url,
-    }
-    return (
-        hikari.Embed(
-            title=("Xur's Inventory and Location").format(**format_dict),
-            url=format_dict["post_url"],
-            description=(
-                "**Arrives:** {start_day_name}, {start_month} {start_day}\n"
-                + "**Departs:** {end_day_name}, {end_month} {end_day}"
-            ).format(**format_dict),
-            color=cfg.kyber_pink,
-        )
-        .set_image(format_dict["gfx_url"])
-        .set_footer(correction)
     )
