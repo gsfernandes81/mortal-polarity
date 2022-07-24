@@ -27,8 +27,12 @@ from sqlalchemy import Column, select
 from sqlalchemy.types import Boolean, DateTime, String
 
 from . import cfg
-from .autoannounce import BaseCustomEvent, WeekendResetSignal
-from .schemas import BaseChannelRecord, BasePostSettings
+from .autoannounce import (
+    BaseChannelRecord,
+    BaseCustomEvent,
+    BasePostSettings,
+    WeekendResetSignal,
+)
 from .utils import (
     Base,
     _create_or_get,

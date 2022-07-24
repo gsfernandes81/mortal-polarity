@@ -20,12 +20,28 @@ import logging
 import aiohttp
 import hikari
 import lightbulb
+from sqlalchemy import String
 from sqlalchemy.sql.expression import delete, select
+from sqlalchemy.sql.schema import Column
 
-from . import cfg, schemas
-from .utils import RefreshCmdListEvent, db_session, url_regex
+from . import cfg, ls
+from .utils import Base, RefreshCmdListEvent, db_session, url_regex
 
 command_registry = {}
+
+
+class Commands(Base):
+    __tablename__ = "commands"
+    __mapper_args__ = {"eager_defaults": True}
+    name = Column("name", String, primary_key=True)
+    description = Column("description", String)
+    response = Column("response", String)
+
+    def __init__(self, name, description, response):
+        super().__init__()
+        self.name = name
+        self.description = description
+        self.response = response
 
 
 @lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
@@ -49,9 +65,7 @@ async def add_command(ctx: lightbulb.Context) -> None:
 
     async with db_session() as session:
         async with session.begin():
-            additional_commands = (
-                await session.execute(select(schemas.Commands))
-            ).fetchall()
+            additional_commands = (await session.execute(select(Commands))).fetchall()
             additional_commands = (
                 [] if additional_commands is None else additional_commands
             )
@@ -61,7 +75,7 @@ async def add_command(ctx: lightbulb.Context) -> None:
                 await ctx.respond("A command with that name already exists")
                 return
 
-            command = schemas.Commands(
+            command = Commands(
                 name,
                 description,
                 text,
@@ -104,9 +118,7 @@ async def del_command(ctx: lightbulb.Context) -> None:
             await ctx.respond("No such command found")
         else:
             async with session.begin():
-                await session.execute(
-                    delete(schemas.Commands).where(schemas.Commands.name == name)
-                )
+                await session.execute(delete(Commands).where(Commands.name == name))
                 bot.remove_command(command_to_delete)
                 await ctx.respond("{} command deleted".format(name))
     # Trigger a refresh of the choices in the delete command
@@ -152,11 +164,9 @@ async def edit_command(ctx: lightbulb.Context):
     bot = ctx.bot
     async with db_session() as session:
         async with session.begin():
-            command: schemas.Commands = (
+            command: Commands = (
                 await session.execute(
-                    select(schemas.Commands).where(
-                        schemas.Commands.name == ctx.options.name.lower()
-                    )
+                    select(Commands).where(Commands.name == ctx.options.name.lower())
                 )
             ).fetchone()[0]
 
@@ -228,8 +238,8 @@ async def edit_command(ctx: lightbulb.Context):
 async def ls_command(ctx: lightbulb.Context):
     async with db_session() as session:
         async with session.begin():
-            settings: schemas.XurPostSettings = session.get(
-                schemas.XurAutopostChannel, 0
+            settings: ls.LostSectorPostSettings = session.get(
+                ls.LostSectorPostSettings, 0
             )
     await ctx.respond(embed=await settings.get_announce_embed())
 
@@ -247,7 +257,7 @@ async def register_commands_on_startup(event: hikari.StartingEvent):
     logging.info("Registering commands")
     async with db_session() as session:
         async with session.begin():
-            command_list = (await session.execute(select(schemas.Commands))).fetchall()
+            command_list = (await session.execute(select(Commands))).fetchall()
             command_list = [] if command_list is None else command_list
             command_list = [command[0] for command in command_list]
             for command in command_list:
@@ -293,9 +303,7 @@ async def user_command(ctx: lightbulb.Context):
         async with session.begin():
             command = (
                 await session.execute(
-                    select(schemas.Commands).where(
-                        schemas.Commands.name == ctx.command.name
-                    )
+                    select(Commands).where(Commands.name == ctx.command.name)
                 )
             ).fetchone()[0]
     text = command.response.strip()
@@ -318,7 +326,7 @@ async def user_command(ctx: lightbulb.Context):
     await ctx.respond(redirected_text)
 
 
-def db_command_to_lb_user_command(command: schemas.Commands):
+def db_command_to_lb_user_command(command: Commands):
     # Needs an open db session watching command
     return lightbulb.command(command.name, command.description, auto_defer=True)(
         lightbulb.implements(lightbulb.SlashCommand)(user_command)

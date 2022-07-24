@@ -24,8 +24,12 @@ from pytz import utc
 from sector_accounting import Rotation
 
 from . import cfg
-from .autoannounce import BaseCustomEvent, DailyResetSignal
-from .schemas import BaseChannelRecord, BasePostSettings
+from .autoannounce import (
+    BaseChannelRecord,
+    BaseCustomEvent,
+    BasePostSettings,
+    DailyResetSignal,
+)
 from .utils import Base, _create_or_get, db_session
 
 
