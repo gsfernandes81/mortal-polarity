@@ -14,31 +14,19 @@
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
-import datetime as dt
 import functools
 import logging
 import re
-from calendar import month_name as month
 from typing import Type, Union
 
-import aiohttp
 import hikari
 import lightbulb
-from pytz import utc
-from sector_accounting import Rotation
-from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String, select
+from sqlalchemy import BigInteger, Boolean, Integer, String, select
 from sqlalchemy.orm import declarative_mixin, declared_attr
 from sqlalchemy.sql.schema import Column
 
 from . import cfg
-from .utils import (
-    Base,
-    _send_embed_if_textable_channel,
-    db_session,
-    follow_link_single_step,
-    operation_timer,
-    weekend_period,
-)
+from .utils import Base, _send_embed_if_textable_channel, db_session, operation_timer
 
 
 @declarative_mixin
@@ -60,47 +48,6 @@ class BasePostSettings:
 
     async def get_announce_embed(self) -> hikari.Embed:
         pass
-
-
-class LostSectorPostSettings(BasePostSettings, Base):
-    async def get_announce_embed(self, date: dt.date = None) -> hikari.Embed:
-        buffer = 1  # Minute
-        if date is None:
-            date = dt.datetime.now(tz=utc) - dt.timedelta(hours=16, minutes=60 - buffer)
-        else:
-            date = date + dt.timedelta(minutes=buffer)
-        rot = Rotation.from_gspread_url(
-            cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=buffer
-        )()
-
-        # Follow the hyperlink to have the newest image embedded
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                rot.shortlink_gfx, allow_redirects=False
-            ) as response:
-                ls_gfx_url = str(response.headers["Location"])
-
-        format_dict = {
-            "month": month[date.month],
-            "day": date.day,
-            "sector": rot,
-            "ls_url": ls_gfx_url,
-        }
-
-        return hikari.Embed(
-            title="**Daily Lost Sector for {month} {day}**".format(**format_dict),
-            description=(
-                "<:LS:849727805994565662> **{sector.name}**:\n\n"
-                + "• Exotic Reward (If Solo): {sector.reward}\n"
-                + "• Champs: {sector.champions}\n"
-                + "• Shields: {sector.shields}\n"
-                + "• Burn: {sector.burn}\n"
-                + "• Modifiers: {sector.modifiers}\n"
-                + "\n"
-                + "**More Info:** <https://kyber3000.com/LS>"
-            ).format(**format_dict),
-            color=cfg.kyber_pink,
-        ).set_image(ls_gfx_url)
 
 
 @declarative_mixin
@@ -248,10 +195,6 @@ class BaseChannelRecord:
                         for channel_id in channel_id_list
                     ]
                 )
-
-
-class LostSectorAutopostChannel(BaseChannelRecord, Base):
-    settings_records: Type[BasePostSettings] = LostSectorPostSettings
 
 
 class Commands(Base):

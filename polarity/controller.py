@@ -15,8 +15,7 @@
 
 import lightbulb
 
-from . import cfg, schemas
-from .utils import db_session
+from . import cfg
 
 
 @lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
@@ -29,39 +28,7 @@ from .utils import db_session
 )
 @lightbulb.implements(lightbulb.SlashCommandGroup)
 async def kyber():
-    # Enables or disables lost sector announcements globally
     pass
-
-
-@kyber.child
-@lightbulb.option(
-    "option",
-    "Enable or disable",
-    type=str,
-    choices=["Enable", "Disable"],
-    required=True,
-)
-@lightbulb.command(
-    "ls_announcements",
-    "Enable or disable all automatic lost sector announcements",
-    auto_defer=True,
-    # The following NEEDS to be included in all privledged commands
-    inherit_checks=True,
-)
-@lightbulb.implements(lightbulb.SlashSubCommand)
-async def ls_announcements(ctx: lightbulb.Context):
-    option = True if ctx.options.option.lower() == "enable" else False
-    async with db_session() as session:
-        async with session.begin():
-            settings = await session.get(schemas.LostSectorPostSettings, 0)
-            if settings is None:
-                settings = schemas.LostSectorPostSettings(0, option)
-                session.add(settings)
-            else:
-                settings.autoannounce_enabled = option
-    await ctx.respond(
-        "Lost sector announcements {}".format("Enabled" if option else "Disabled")
-    )
 
 
 def register_all(bot: lightbulb.BotApp) -> None:

@@ -18,7 +18,7 @@ import lightbulb
 import uvloop
 from lightbulb.ext import tasks
 
-from . import cfg, controller, debug_commands, user_commands, xur, autoannounce
+from . import autoannounce, cfg, controller, debug_commands, ls, user_commands, xur
 
 # Note: Alembic's env.py is set up to import Base from polarity.main
 from .utils import Base
@@ -42,6 +42,7 @@ if __name__ == "__main__":
     user_commands.register_all(bot)
     controller.register_all(bot)
     xur.register(bot, autoannounce.autopost_cmd_group, controller.kyber)
+    ls.register(bot, autoannounce.autopost_cmd_group, controller.kyber)
     autoannounce.register(bot)
     tasks.load(bot)
     if cfg.test_env:

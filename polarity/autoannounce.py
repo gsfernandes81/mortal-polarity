@@ -20,11 +20,6 @@ import lightbulb
 from aiohttp import web
 
 from . import cfg, custom_checks
-from .schemas import (
-    LostSectorAutopostChannel,
-    LostSectorPostSettings,
-)
-from .utils import _create_or_get
 
 app = web.Application()
 
@@ -89,21 +84,6 @@ class WeekendResetSignal(ResetSignal):
     qualifier = "weekend"
 
 
-class LostSectorSignal(BaseCustomEvent):
-    async def conditional_daily_reset_repeater(self, event: DailyResetSignal) -> None:
-        if await self.is_autoannounce_enabled():
-            event.bot.dispatch(self)
-
-    async def is_autoannounce_enabled(self):
-        settings = await _create_or_get(
-            LostSectorPostSettings, 0, autoannounce_enabled=True
-        )
-        return settings.autoannounce_enabled
-
-    def arm(self) -> None:
-        self.bot.listen()(self.conditional_daily_reset_repeater)
-
-
 @lightbulb.add_checks(
     lightbulb.checks.dm_only
     | custom_checks.has_guild_permissions(hikari.Permissions.ADMINISTRATOR)
@@ -142,11 +122,7 @@ def register(bot: lightbulb.BotApp) -> None:
     DailyResetSignal(bot).arm()
     WeeklyResetSignal(bot).arm()
     WeekendResetSignal(bot).arm()
-    LostSectorSignal(bot).arm()
     bot.listen(hikari.StartedEvent)(start_signal_receiver)
 
     # Connect commands
-    LostSectorAutopostChannel.register_with_bot(
-        bot, autopost_cmd_group, LostSectorSignal
-    )
     bot.command(autopost_cmd_group)
