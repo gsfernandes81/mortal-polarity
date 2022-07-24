@@ -17,12 +17,10 @@ import functools
 import operator
 
 import hikari
-
 from lightbulb import context as context_
 from lightbulb import errors
+from lightbulb.checks import Check, _guild_only
 from lightbulb.utils import permissions
-from lightbulb.checks import _guild_only
-from lightbulb.checks import Check
 
 
 async def _has_guild_permissions(

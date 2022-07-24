@@ -16,6 +16,7 @@
 # RUN WITH CAUTION
 # DELETES ALL PUBLISHED COMMANDS FOR cfg.main_token GLOBALLY
 import asyncio
+
 import hikari
 
 from . import cfg
