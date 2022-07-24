@@ -103,103 +103,6 @@ class LostSectorPostSettings(BasePostSettings, Base):
         ).set_image(ls_gfx_url)
 
 
-class XurPostSettings(BasePostSettings, Base):
-    # url: the infographic url
-    url = Column("url", String, nullable=False, default=cfg.defaults.xur.gfx_url)
-    # post_url: hyperlink for the post title
-    post_url = Column("post_url", String, default=cfg.defaults.xur.post_url)
-    url_redirect_target = Column("url_redirect_target", String)
-    url_last_modified = Column("url_last_modified", DateTime)
-    url_last_checked = Column("url_last_checked", DateTime)
-    # ToDo: Look for all armed url watchers at startup and start them again
-    url_watcher_armed = Column(
-        "url_watcher_armed", Boolean, default=False, server_default="f"
-    )
-
-    def __init__(
-        self,
-        id: int,
-        url: str = cfg.defaults.xur.gfx_url,
-        post_url: str = cfg.defaults.xur.post_url,
-        autoannounce_enabled: bool = True,
-    ):
-        self.id = id
-        self.url = url
-        self.post_url = post_url
-        self.autoannounce_enabled = autoannounce_enabled
-
-    async def initialise_url_params(self):
-        """
-        Initialise the Url's redirect_target, last_modified and last_checked properties
-        if they are set to None
-        """
-        if not (
-            self.url_redirect_target == None
-            or self.url_last_checked == None
-            or self.url_last_modified == None
-        ):
-            return
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self.url, allow_redirects=False) as resp:
-                self.url_redirect_target = resp.headers["Location"]
-                self.url_last_checked = dt.datetime.now()
-                self.url_last_modified = dt.datetime.now()
-
-    async def wait_for_url_update(self):
-        async with db_session() as db_session_:
-            async with db_session_.begin():
-                db_session_.add(self)
-                self.url_watcher_armed = True
-            check_interval = 10
-            async with aiohttp.ClientSession() as session:
-                while True:
-                    async with session.get(self.url, allow_redirects=False) as resp:
-                        if resp.headers["Location"] != self.url_redirect_target:
-                            async with db_session_.begin():
-                                db_session_.add(self)
-                                self.url_redirect_target = resp.headers["Location"]
-                                self.url_last_modified = dt.datetime.now()
-                                self.url_watcher_armed = False
-                            return self
-                        await asyncio.sleep(check_interval)
-
-    async def get_announce_embed(
-        self, correction: str = "", date: dt.date = None
-    ) -> hikari.Embed:
-        # Use the current date if none is specified
-        if date is None:
-            date = dt.datetime.now(tz=utc)
-        # Get the period of validity for this message
-        start_date, end_date = weekend_period(date)
-        # Follow urls 1 step into redirects
-        gfx_url = await follow_link_single_step(self.url)
-        post_url = await follow_link_single_step(self.post_url)
-
-        format_dict = {
-            "start_month": month[start_date.month],
-            "end_month": month[end_date.month],
-            "start_day": start_date.day,
-            "start_day_name": start_date.strftime("%A"),
-            "end_day": end_date.day,
-            "end_day_name": end_date.strftime("%A"),
-            "post_url": post_url,
-            "gfx_url": gfx_url,
-        }
-        return (
-            hikari.Embed(
-                title=("Xur's Inventory and Location").format(**format_dict),
-                url=format_dict["post_url"],
-                description=(
-                    "**Arrives:** {start_day_name}, {start_month} {start_day}\n"
-                    + "**Departs:** {end_day_name}, {end_month} {end_day}"
-                ).format(**format_dict),
-                color=cfg.kyber_pink,
-            )
-            .set_image(format_dict["gfx_url"])
-            .set_footer(correction)
-        )
-
-
 @declarative_mixin
 class BaseChannelRecord:
     @declared_attr
@@ -349,10 +252,6 @@ class BaseChannelRecord:
 
 class LostSectorAutopostChannel(BaseChannelRecord, Base):
     settings_records: Type[BasePostSettings] = LostSectorPostSettings
-
-
-class XurAutopostChannel(BaseChannelRecord, Base):
-    settings_records: Type[BasePostSettings] = XurPostSettings
 
 
 class Commands(Base):

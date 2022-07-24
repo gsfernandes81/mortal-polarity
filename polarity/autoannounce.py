@@ -23,8 +23,6 @@ from . import cfg, custom_checks
 from .schemas import (
     LostSectorAutopostChannel,
     LostSectorPostSettings,
-    XurAutopostChannel,
-    XurPostSettings,
 )
 from .utils import _create_or_get
 
@@ -106,34 +104,6 @@ class LostSectorSignal(BaseCustomEvent):
         self.bot.listen()(self.conditional_daily_reset_repeater)
 
 
-class XurSignal(BaseCustomEvent):
-    async def conditional_weekend_reset_repeater(
-        self, event: WeekendResetSignal
-    ) -> None:
-        if not await self.is_autoannounce_enabled():
-            return
-
-        settings: XurPostSettings = await _create_or_get(XurPostSettings, 0)
-
-        # Debug code
-        if cfg.test_env and cfg.trigger_without_url_update:
-            event.bot.dispatch(self)
-
-        await settings.wait_for_url_update()
-        event.bot.dispatch(self)
-
-    async def is_autoannounce_enabled(self):
-        settings = await _create_or_get(XurPostSettings, 0, autoannounce_enabled=True)
-        return settings.autoannounce_enabled
-
-    def arm(self) -> None:
-        self.bot.listen()(self.conditional_weekend_reset_repeater)
-
-    async def wait_for_url_update(self):
-        settings: XurPostSettings = await _create_or_get(XurPostSettings, 0)
-        await settings.wait_for_url_update()
-
-
 @lightbulb.add_checks(
     lightbulb.checks.dm_only
     | custom_checks.has_guild_permissions(hikari.Permissions.ADMINISTRATOR)
@@ -159,23 +129,24 @@ async def announcements_error_handler(
     )
 
 
-async def arm(bot: lightbulb.BotApp) -> None:
-    # Arm all signals
-    DailyResetSignal(bot).arm()
-    WeeklyResetSignal(bot).arm()
-    WeekendResetSignal(bot).arm()
-    LostSectorSignal(bot).arm()
-    XurSignal(bot).arm()
-
-    # Connect commands
-    LostSectorAutopostChannel.register_with_bot(
-        bot, autopost_cmd_group, LostSectorSignal
-    )
-    XurAutopostChannel.register_with_bot(bot, autopost_cmd_group, XurSignal)
-    bot.command(autopost_cmd_group)
-
+async def start_signal_receiver(event: hikari.StartedEvent) -> None:
     # Start the web server for periodic signals from apscheduler
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "localhost", cfg.port)
     await site.start()
+
+
+def register(bot: lightbulb.BotApp) -> None:
+    # Arm all signals
+    DailyResetSignal(bot).arm()
+    WeeklyResetSignal(bot).arm()
+    WeekendResetSignal(bot).arm()
+    LostSectorSignal(bot).arm()
+    bot.listen(hikari.StartedEvent)(start_signal_receiver)
+
+    # Connect commands
+    LostSectorAutopostChannel.register_with_bot(
+        bot, autopost_cmd_group, LostSectorSignal
+    )
+    bot.command(autopost_cmd_group)
