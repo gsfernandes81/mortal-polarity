@@ -17,8 +17,6 @@ import asyncio
 import datetime as dt
 import logging
 from calendar import month_name as month
-from pydoc import describe
-from queue import LifoQueue
 from typing import List, Type
 
 import aiohttp
