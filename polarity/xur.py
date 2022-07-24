@@ -17,11 +17,14 @@ import asyncio
 import datetime as dt
 import logging
 from calendar import month_name as month
+from pydoc import describe
+from queue import LifoQueue
 from typing import List, Type
 
 import aiohttp
 import hikari
 import lightbulb
+import lightbulb.ext.wtf as wtf
 from pytz import utc
 from sqlalchemy import Column, select
 from sqlalchemy.types import Boolean, DateTime, String
@@ -173,35 +176,6 @@ class XurSignal(BaseCustomEvent):
         await settings.wait_for_url_update()
 
 
-@lightbulb.command(
-    "xur",
-    "Xur announcement management",
-    guilds=[
-        cfg.kyber_discord_server_id,
-    ],
-    inherit_checks=True,
-)
-@lightbulb.implements(lightbulb.SlashSubGroup)
-async def xur_announcements():
-    pass
-
-
-@xur_announcements.child
-@lightbulb.option(
-    "option",
-    "Enable or disable",
-    type=str,
-    choices=["Enable", "Disable"],
-    required=True,
-)
-@lightbulb.command(
-    "autoposts",
-    "Enable or disable all automatic lost sector announcements",
-    auto_defer=True,
-    # The following NEEDS to be included in all privledged commands
-    inherit_checks=True,
-)
-@lightbulb.implements(lightbulb.SlashSubCommand)
 async def xur_autoposts(ctx: lightbulb.Context):
     option = True if ctx.options.option.lower() == "enable" else False
     async with db_session() as session:
@@ -217,20 +191,6 @@ async def xur_autoposts(ctx: lightbulb.Context):
     )
 
 
-@xur_announcements.child
-@lightbulb.option(
-    "url",
-    "The url to set",
-    type=str,
-    required=False,
-)
-@lightbulb.command(
-    "infogfx_url",
-    "Set the Xur infographic url, to check and post",
-    auto_defer=True,
-    inherit_checks=True,
-)
-@lightbulb.implements(lightbulb.SlashSubCommand)
 async def xur_gfx_url(ctx: lightbulb.Context):
     url = ctx.options.url.lower() if ctx.options.url is not None else None
     async with db_session() as session:
@@ -257,20 +217,6 @@ async def xur_gfx_url(ctx: lightbulb.Context):
     await ctx.respond("Xur Infographic url updated to <{}>".format(url))
 
 
-@xur_announcements.child
-@lightbulb.option(
-    "url",
-    "The url to set",
-    type=str,
-    required=False,
-)
-@lightbulb.command(
-    "post_url",
-    "Set the Xur infographic url, to check and post",
-    auto_defer=True,
-    inherit_checks=True,
-)
-@lightbulb.implements(lightbulb.SlashSubCommand)
 async def xur_post_url(ctx: lightbulb.Context):
     url = ctx.options.url.lower() if ctx.options.url is not None else None
     async with db_session() as session:
@@ -296,20 +242,6 @@ async def xur_post_url(ctx: lightbulb.Context):
     await ctx.respond("Xur Post url updated to <{}>".format(url))
 
 
-@xur_announcements.child
-@lightbulb.option(
-    "change",
-    "What has changed",
-    type=str,
-    required=False,
-)
-@lightbulb.command(
-    "update",
-    "Update a post, optionally with text saying what has changed",
-    auto_defer=True,
-    inherit_checks=True,
-)
-@lightbulb.implements(lightbulb.SlashSubCommand)
 async def xur_rectify_announcement(ctx: lightbulb.Context):
     """Correct a mistake in the xur announcement
     pull from urls again and update existing posts"""
@@ -352,17 +284,99 @@ async def xur_rectify_announcement(ctx: lightbulb.Context):
             await ctx.edit_last_response("Posts corrected")
 
 
-@xur_announcements.child
-@lightbulb.command(
-    "announce",
-    "Trigger an announcement manually",
-    auto_defer=True,
-    inherit_checks=True,
-)
-@lightbulb.implements(lightbulb.SlashSubCommand)
 async def manual_xur_announce(ctx: lightbulb.Context):
     ctx.bot.dispatch(XurSignal(ctx.bot))
     await ctx.respond("Xur announcements being sent out now")
+
+
+# Xur management commands for kyber
+xur_announcements = wtf.Command[
+    wtf.Implements[lightbulb.SlashSubGroup],
+    wtf.Name["xur"],
+    wtf.Description["Xur announcement management"],
+    wtf.Guilds[cfg.kyber_discord_server_id],
+    wtf.InheritChecks[True],
+    wtf.Subcommands[
+        # Autoposts Enable/Disable
+        wtf.Command[
+            wtf.Name["autoposts"],
+            wtf.Description[
+                "Enable or disable all automatic lost sector announcements"
+            ],
+            wtf.AutoDefer[True],
+            wtf.InheritChecks[True],
+            wtf.Options[
+                wtf.Option[
+                    wtf.Name["option"],
+                    wtf.Description["Enable or disable"],
+                    wtf.Type[str],
+                    wtf.Choices["Enable", "Disable"],
+                    wtf.Required[True],
+                ],
+            ],
+            wtf.Implements[lightbulb.SlashSubCommand],
+            wtf.Executes[xur_autoposts],
+        ],
+        wtf.Command[
+            wtf.Name["infogfx_url"],
+            wtf.Description["Set the Xur infographic url, to check and post"],
+            wtf.AutoDefer[True],
+            wtf.InheritChecks[True],
+            wtf.Options[
+                wtf.Option[
+                    wtf.Name["url"],
+                    wtf.Description["The url to set"],
+                    wtf.Type[str],
+                    wtf.Required[False],
+                ],
+            ],
+            wtf.Implements[lightbulb.SlashSubCommand],
+            wtf.Executes[xur_gfx_url],
+        ],
+        wtf.Command[
+            wtf.Name["post_url"],
+            wtf.Description["Set the Xur infographic url, to check and post"],
+            wtf.AutoDefer[True],
+            wtf.InheritChecks[True],
+            wtf.Options[
+                wtf.Option[
+                    wtf.Name["url"],
+                    wtf.Description["The url to set"],
+                    wtf.Type[str],
+                    wtf.Required[False],
+                ],
+            ],
+            wtf.Implements[lightbulb.SlashSubCommand],
+            wtf.Executes[xur_post_url],
+        ],
+        wtf.Command[
+            wtf.Name["update"],
+            wtf.Description[
+                "Update a post, optionally with text saying what has changed"
+            ],
+            wtf.AutoDefer[True],
+            wtf.InheritChecks[True],
+            wtf.Options[
+                wtf.Option[
+                    wtf.Name["change"],
+                    wtf.Description["What has changed"],
+                    wtf.Type[str],
+                    wtf.Required[False],
+                ],
+            ],
+            wtf.Implements[lightbulb.SlashSubCommand],
+            wtf.Executes[xur_rectify_announcement],
+        ],
+        wtf.Command[
+            wtf.Name["announce"],
+            wtf.Description["Trigger an announcement manually"],
+            wtf.AutoDefer[True],
+            wtf.InheritChecks[True],
+            wtf.Implements[lightbulb.SlashSubCommand],
+            wtf.Executes[manual_xur_announce],
+        ],
+    ],
+]
 
 
 def register(bot, usr_ctrl_cmd_group, kyber_ctrl_cmd_group):
