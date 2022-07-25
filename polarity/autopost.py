@@ -27,7 +27,7 @@ from sqlalchemy.orm import declarative_mixin, declared_attr
 from sqlalchemy.sql.schema import Column
 
 from . import cfg, custom_checks
-from .utils import Base, _send_embed_if_textable_channel, db_session, operation_timer
+from .utils import _send_embed_if_textable_channel, db_session, operation_timer
 
 app = web.Application()
 

@@ -24,7 +24,7 @@ from pytz import utc
 from sector_accounting import Rotation
 
 from . import cfg
-from .autoannounce import (
+from .autopost import (
     BaseChannelRecord,
     BaseCustomEvent,
     BasePostSettings,
