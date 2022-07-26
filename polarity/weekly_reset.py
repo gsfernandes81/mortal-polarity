@@ -45,7 +45,7 @@ class WeeklyResetPostSignal(BaseUrlSignal):
 
 
 class WeeklyResetPostControlCommands(ControlCommandsImpl):
-    announcement_name = "Weekly_reset"
+    announcement_name = "Weekly reset"
     settings_table = WeeklyResetPostSettings
     autopost_channel_table = WeeklyResetAutopostChannel
     autopost_trigger_signal = WeeklyResetPostSignal

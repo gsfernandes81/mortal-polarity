@@ -232,7 +232,7 @@ class ControlCommandsImpl:
         # Announcement management commands for kyber
         return wtf.Command[
             wtf.Implements[lightbulb.SlashSubGroup],
-            wtf.Name[self.announcement_name.lower()],
+            wtf.Name[self.announcement_name.lower().replace(" ", "_")],
             wtf.Description[
                 "{} announcement management".format(self.announcement_name)
             ],
