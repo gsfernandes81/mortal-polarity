@@ -18,7 +18,16 @@ import lightbulb
 import uvloop
 from lightbulb.ext import tasks
 
-from . import autopost, cfg, controller, debug_commands, ls, user_commands, xur
+from . import (
+    autopost,
+    cfg,
+    controller,
+    debug_commands,
+    ls,
+    user_commands,
+    xur,
+    weekly_reset,
+)
 
 # Note: Alembic's env.py is set up to import Base from polarity.main
 from .utils import Base
@@ -42,6 +51,9 @@ if __name__ == "__main__":
     user_commands.register_all(bot)
     controller.register_all(bot)
     xur.XurControlCommands().register(
+        bot, autopost.autopost_cmd_group, controller.kyber
+    )
+    weekly_reset.WeeklyResetPostControlCommands().register(
         bot, autopost.autopost_cmd_group, controller.kyber
     )
     ls.register(bot, autopost.autopost_cmd_group, controller.kyber)

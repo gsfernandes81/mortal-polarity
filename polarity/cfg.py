@@ -79,3 +79,7 @@ class defaults(abc.ABC):
     class xur(abc.ABC):
         gfx_url = "https://kyber3000.com/Xur"
         post_url = "https://kyber3000.com/Xurpost"
+
+    class weekly_reset(abc.ABC):
+        gfx_url = "https://kyber3000.com/Reset"
+        post_url = "https://kyber3000.com/Resetpost"
