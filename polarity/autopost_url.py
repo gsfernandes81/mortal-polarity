@@ -51,9 +51,9 @@ from .utils import (
 @declarative_mixin
 class UrlPostSettings(BasePostSettings):
     # url: the infographic url
-    url = Column("url", String, nullable=False, default=cfg.defaults.xur.gfx_url)
+    url = Column("url", String, nullable=False)
     # post_url: hyperlink for the post title
-    post_url = Column("post_url", String, default=cfg.defaults.xur.post_url)
+    post_url = Column("post_url", String)
     url_redirect_target = Column("url_redirect_target", String)
     url_last_modified = Column("url_last_modified", DateTime)
     url_last_checked = Column("url_last_checked", DateTime)
@@ -403,9 +403,7 @@ class ControlCommandsImpl:
             async with session.begin():
                 settings: UrlPostSettings = await session.get(self.settings_table, 0)
                 if settings is None:
-                    await ctx.respond(
-                        "Please enable xur autoposts before using this cmd"
-                    )
+                    await ctx.respond("Please enable autoposts before using this cmd")
                 channel_record_list = (
                     await session.execute(
                         select(self.autopost_channel_table).where(
