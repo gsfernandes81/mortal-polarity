@@ -45,6 +45,7 @@ class XurSignal(BaseUrlSignal):
 
 
 class XurControlCommands(ControlCommandsImpl):
+    announcement_name = "Xur"
     settings_table = XurPostSettings
     autopost_channel_table = XurAutopostChannel
     autopost_trigger_signal = XurSignal

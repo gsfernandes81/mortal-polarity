@@ -196,6 +196,7 @@ class ControlCommandsImpl:
     autopost_trigger_signal: Type[BaseUrlSignal] = BaseUrlSignal
     default_gfx_url: str
     default_post_url: str
+    announcement_name: str
     _partials_applied = False
 
     def __init__(self):
@@ -227,12 +228,14 @@ class ControlCommandsImpl:
             return self
 
     @staticmethod
-    def commands_from_impl_struct(cls) -> lightbulb.SlashCommandGroup:
+    def commands_from_impl_struct(self) -> lightbulb.SlashCommandGroup:
         # Announcement management commands for kyber
         return wtf.Command[
             wtf.Implements[lightbulb.SlashSubGroup],
-            wtf.Name["xur"],
-            wtf.Description["Xur announcement management"],
+            wtf.Name[self.announcement_name.lower()],
+            wtf.Description[
+                "{} announcement management".format(self.announcement_name)
+            ],
             wtf.Guilds[cfg.kyber_discord_server_id],
             wtf.InheritChecks[True],
             wtf.Subcommands[
@@ -254,11 +257,15 @@ class ControlCommandsImpl:
                         ],
                     ],
                     wtf.Implements[lightbulb.SlashSubCommand],
-                    wtf.Executes[cls.autopost_ctrl],
+                    wtf.Executes[self.autopost_ctrl],
                 ],
                 wtf.Command[
                     wtf.Name["infogfx_url"],
-                    wtf.Description["Set the Xur infographic url, to check and post"],
+                    wtf.Description[
+                        "Set the {} infographic url, to check and post".format(
+                            self.announcement_name.lower()
+                        )
+                    ],
                     wtf.AutoDefer[True],
                     wtf.InheritChecks[True],
                     wtf.Options[
@@ -270,11 +277,15 @@ class ControlCommandsImpl:
                         ],
                     ],
                     wtf.Implements[lightbulb.SlashSubCommand],
-                    wtf.Executes[cls.gfx_url],
+                    wtf.Executes[self.gfx_url],
                 ],
                 wtf.Command[
                     wtf.Name["post_url"],
-                    wtf.Description["Set the Xur infographic url, to check and post"],
+                    wtf.Description[
+                        "Set the {} post url, to check and post".format(
+                            self.announcement_name.lower()
+                        )
+                    ],
                     wtf.AutoDefer[True],
                     wtf.InheritChecks[True],
                     wtf.Options[
@@ -286,7 +297,7 @@ class ControlCommandsImpl:
                         ],
                     ],
                     wtf.Implements[lightbulb.SlashSubCommand],
-                    wtf.Executes[cls.post_url],
+                    wtf.Executes[self.post_url],
                 ],
                 wtf.Command[
                     wtf.Name["update"],
@@ -304,7 +315,7 @@ class ControlCommandsImpl:
                         ],
                     ],
                     wtf.Implements[lightbulb.SlashSubCommand],
-                    wtf.Executes[cls.rectify_announcement],
+                    wtf.Executes[self.rectify_announcement],
                 ],
                 wtf.Command[
                     wtf.Name["announce"],
@@ -312,7 +323,7 @@ class ControlCommandsImpl:
                     wtf.AutoDefer[True],
                     wtf.InheritChecks[True],
                     wtf.Implements[lightbulb.SlashSubCommand],
-                    wtf.Executes[cls.manual_announce],
+                    wtf.Executes[self.manual_announce],
                 ],
             ],
         ]
