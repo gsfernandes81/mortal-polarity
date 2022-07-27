@@ -30,8 +30,8 @@ class WeeklyResetPostSettings(UrlPostSettings, Base):
         "**From** {start_day_name}, {start_month} {start_day}\n"
         + "**Till** {end_day_name}, {end_month} {end_day}"
     )
-    default_gfx_url: str = cfg.defaults.xur.gfx_url
-    default_post_url: str = cfg.defaults.xur.post_url
+    default_gfx_url: str = cfg.defaults.weekly_reset.gfx_url
+    default_post_url: str = cfg.defaults.weekly_reset.post_url
     validity_period = staticmethod(week_period)
     embed_command_name = "Weekly reset"
 
