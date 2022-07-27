@@ -33,6 +33,7 @@ class XurPostSettings(UrlPostSettings, Base):
     default_gfx_url: str = cfg.defaults.xur.gfx_url
     default_post_url: str = cfg.defaults.xur.post_url
     validity_period = staticmethod(weekend_period)
+    embed_command_name = "Xur"
 
 
 class XurAutopostChannel(UrlAutopostChannel, Base):

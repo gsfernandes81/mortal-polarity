@@ -60,6 +60,7 @@ class UrlPostSettings(BasePostSettings):
     url_watcher_armed = Column(
         "url_watcher_armed", Boolean, default=False, server_default="f"
     )
+    default_id: int = 0
 
     # NOTE These need to be defined for all subclasses:
     embed_title: str
@@ -152,6 +153,26 @@ class UrlPostSettings(BasePostSettings):
             .set_footer(correction)
         )
 
+    # Note cls is applied partially durign register_embed_user_cmd
+    @staticmethod
+    async def embed_command_impl(cls, ctx: lightbulb.Context):
+        async with db_session() as session:
+            async with session.begin():
+                settings = await session.get(cls, cls.default_id)
+                await ctx.respond(embed=await settings.get_announce_embed())
+
+    @classmethod
+    def register_embed_user_cmd(cls, bot: lightbulb.BotApp):
+        bot.command(
+            wtf.Command[
+                wtf.Name[cls.embed_command_name.lower().replace(" ", "_")],
+                wtf.Description["{} post command".format(cls.embed_command_name)],
+                wtf.AutoDefer[True],
+                wtf.Implements[lightbulb.SlashCommand],
+                wtf.Executes[functools.partial(cls.embed_command_impl, cls)],
+            ]
+        )
+
 
 @declarative_mixin
 class UrlAutopostChannel(BaseChannelRecord):
@@ -220,6 +241,7 @@ class ControlCommandsImpl:
             self.autopost_channel_table.register_with_bot(
                 bot, usr_ctrl_cmd_group, self.autopost_trigger_signal
             )
+            self.settings_table.register_embed_user_cmd(bot)
             kyber_ctrl_cmd_group.child(self.commands_from_impl_struct(self))
             self.autopost_trigger_signal(bot).arm()
         except lightbulb.CommandAlreadyExists:
