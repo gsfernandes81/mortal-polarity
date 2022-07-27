@@ -21,7 +21,7 @@ import datetime as dt
 import functools
 import logging
 from calendar import month_name as month
-from typing import List, Type
+from typing import List, Type, Callable
 
 import aiohttp
 import hikari
@@ -37,7 +37,6 @@ from .autopost import (
     BaseChannelRecord,
     BaseCustomEvent,
     BasePostSettings,
-    WeekendResetSignal,
 )
 from .utils import (
     _create_or_get,
@@ -61,11 +60,17 @@ class UrlPostSettings(BasePostSettings):
     url_watcher_armed = Column(
         "url_watcher_armed", Boolean, default=False, server_default="f"
     )
+
     # NOTE These need to be defined for all subclasses:
     embed_title: str
     embed_description: str
     default_gfx_url: str
     default_post_url: str
+    # Assign a function to this that returns the validity period of
+    # posts made for this announce target
+    # Must be a staticmethod decorated function
+    validity_period: Callable
+    embed_command_name: str
 
     def __init__(
         self,
@@ -78,11 +83,6 @@ class UrlPostSettings(BasePostSettings):
         self.url = url if url is not None else self.default_gfx_url
         self.post_url = post_url if post_url is not None else self.default_post_url
         self.autoannounce_enabled = autoannounce_enabled
-
-        # Assign a function to this that returns the validity period of
-        # posts made for this announce target
-        # Must be a staticmethod decorated function
-        validity_period: function
 
     async def initialise_url_params(self):
         """
@@ -161,9 +161,9 @@ class UrlAutopostChannel(BaseChannelRecord):
 class BaseUrlSignal(BaseCustomEvent):
     # NOTE this must be specified on subclassing
     settings_table: Type[UrlPostSettings]
-    trigger_on_signal: hikari.Event = WeekendResetSignal
+    trigger_on_signal: hikari.Event
 
-    async def conditional_weekend_reset_repeater(self, event) -> None:
+    async def conditional_reset_repeater(self, event) -> None:
         if not await self.is_autoannounce_enabled():
             return
 
@@ -183,7 +183,7 @@ class BaseUrlSignal(BaseCustomEvent):
         return settings.autoannounce_enabled
 
     def arm(self) -> None:
-        self.bot.listen(self.trigger_on_signal)(self.conditional_weekend_reset_repeater)
+        self.bot.listen(self.trigger_on_signal)(self.conditional_reset_repeater)
 
     async def wait_for_url_update(self):
         settings: UrlPostSettings = await _create_or_get(self.settings_table, 0)
@@ -191,9 +191,9 @@ class BaseUrlSignal(BaseCustomEvent):
 
 
 class ControlCommandsImpl:
-    settings_table: Type[UrlPostSettings] = UrlPostSettings
-    autopost_channel_table: Type[UrlAutopostChannel] = UrlAutopostChannel
-    autopost_trigger_signal: Type[BaseUrlSignal] = BaseUrlSignal
+    settings_table: Type[UrlPostSettings]
+    autopost_channel_table: Type[UrlAutopostChannel]
+    autopost_trigger_signal: Type[BaseUrlSignal]
     default_gfx_url: str
     default_post_url: str
     announcement_name: str
@@ -218,7 +218,7 @@ class ControlCommandsImpl:
     ):
         try:
             self.autopost_channel_table.register_with_bot(
-                bot, usr_ctrl_cmd_group, BaseUrlSignal
+                bot, usr_ctrl_cmd_group, self.autopost_trigger_signal
             )
             kyber_ctrl_cmd_group.child(self.commands_from_impl_struct(self))
             self.autopost_trigger_signal(bot).arm()
