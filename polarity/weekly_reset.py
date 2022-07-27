@@ -27,8 +27,8 @@ from .utils import Base, week_period
 class WeeklyResetPostSettings(UrlPostSettings, Base):
     embed_title: str = "Weekly Reset Post and Infographic"
     embed_description: str = (
-        "**Arrives:** {start_day_name}, {start_month} {start_day}\n"
-        + "**Departs:** {end_day_name}, {end_month} {end_day}"
+        "**From** {start_day_name}, {start_month} {start_day}\n"
+        + "**Till** {end_day_name}, {end_month} {end_day}"
     )
     default_gfx_url: str = cfg.defaults.xur.gfx_url
     default_post_url: str = cfg.defaults.xur.post_url
