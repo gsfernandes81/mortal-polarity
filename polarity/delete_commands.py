@@ -34,6 +34,10 @@ async def main():
             application.id, (), guild=hikari.UNDEFINED
         )
 
+        await client.set_application_commands(
+            application.id, (), guild=(cfg.kyber_discord_server_id)
+        )
+
 
 if __name__ == "__main__":
     asyncio.run(main())
