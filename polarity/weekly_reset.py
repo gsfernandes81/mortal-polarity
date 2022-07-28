@@ -38,6 +38,7 @@ class WeeklyResetPostSettings(UrlPostSettings, Base):
 
 class WeeklyResetAutopostChannel(UrlAutopostChannel, Base):
     settings_records = WeeklyResetPostSettings
+    control_command_name = "reset"
 
 
 class WeeklyResetPostSignal(BaseUrlSignal):

@@ -69,6 +69,7 @@ class BaseChannelRecord:
 
     # Settings object for this channel type
     settings_records: Type[BasePostSettings]
+    control_command_name: str = None
 
     def __init__(self, id: int, server_id: int, enabled: bool):
         self.id = id
@@ -91,7 +92,9 @@ class BaseChannelRecord:
                 required=True,
             )(
                 lightbulb.command(
-                    "".join(re.findall("[A-Z][^A-Z]*", cls.__name__)[:-2]).lower(),
+                    "".join(re.findall("[A-Z][^A-Z]*", cls.__name__)[:-2]).lower()
+                    if cls.control_command_name is None
+                    else cls.control_command_name,
                     "Lost sector auto posts",
                     auto_defer=True,
                     guilds=cfg.kyber_discord_server_id,
