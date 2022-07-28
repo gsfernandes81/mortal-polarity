@@ -33,7 +33,7 @@ class WeeklyResetPostSettings(UrlPostSettings, Base):
     default_gfx_url: str = cfg.defaults.weekly_reset.gfx_url
     default_post_url: str = cfg.defaults.weekly_reset.post_url
     validity_period = staticmethod(week_period)
-    embed_command_name = "Weekly reset"
+    embed_command_name = "reset"
 
 
 class WeeklyResetAutopostChannel(UrlAutopostChannel, Base):
