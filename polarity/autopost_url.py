@@ -72,6 +72,7 @@ class UrlPostSettings(BasePostSettings):
     # Must be a staticmethod decorated function
     validity_period: Callable
     embed_command_name: str
+    embed_command_description: str
 
     def __init__(
         self,
@@ -166,7 +167,10 @@ class UrlPostSettings(BasePostSettings):
         bot.command(
             wtf.Command[
                 wtf.Name[cls.embed_command_name.lower().replace(" ", "_")],
-                wtf.Description["{} post command".format(cls.embed_command_name)],
+                wtf.Description[
+                    cls.embed_command_description
+                    or "{} post command".format(cls.embed_command_name)
+                ],
                 wtf.AutoDefer[True],
                 wtf.Implements[lightbulb.SlashCommand],
                 wtf.Executes[functools.partial(cls.embed_command_impl, cls)],

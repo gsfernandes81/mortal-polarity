@@ -34,6 +34,7 @@ class XurPostSettings(UrlPostSettings, Base):
     default_post_url: str = cfg.defaults.xur.post_url
     validity_period = staticmethod(weekend_period)
     embed_command_name = "Xur"
+    embed_command_description = "Xur infographic and post"
 
 
 class XurAutopostChannel(UrlAutopostChannel, Base):
