@@ -238,7 +238,7 @@ async def edit_command(ctx: lightbulb.Context):
 async def ls_command(ctx: lightbulb.Context):
     async with db_session() as session:
         async with session.begin():
-            settings: ls.LostSectorPostSettings = session.get(
+            settings: ls.LostSectorPostSettings = await session.get(
                 ls.LostSectorPostSettings, 0
             )
     await ctx.respond(embed=await settings.get_announce_embed())
