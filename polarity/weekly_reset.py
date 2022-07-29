@@ -34,6 +34,7 @@ class WeeklyResetPostSettings(UrlPostSettings, Base):
     default_post_url: str = cfg.defaults.weekly_reset.post_url
     validity_period = staticmethod(week_period)
     embed_command_name = "reset"
+    embed_command_description = "Weekly reset post and infographic"
 
 
 class WeeklyResetAutopostChannel(UrlAutopostChannel, Base):
