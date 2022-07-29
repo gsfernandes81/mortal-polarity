@@ -83,6 +83,11 @@ class BaseChannelRecord:
         cmd_group: lightbulb.SlashCommandGroup,
         announce_event: Type[hikari.Event],
     ):
+        cls.control_command_name = (
+            " ".join(re.findall("[A-Z][^A-Z]*", cls.__name__)[:-2])
+            if cls.control_command_name is None
+            else cls.control_command_name
+        )
         cmd_group.child(
             lightbulb.option(
                 "option",
@@ -92,10 +97,8 @@ class BaseChannelRecord:
                 required=True,
             )(
                 lightbulb.command(
-                    "".join(re.findall("[A-Z][^A-Z]*", cls.__name__)[:-2]).lower()
-                    if cls.control_command_name is None
-                    else cls.control_command_name,
-                    "Lost sector auto posts",
+                    cls.control_command_name.lower().replace(" ", "_"),
+                    "{} auto posts".format(cls.control_command_name.capitalize()),
                     auto_defer=True,
                     guilds=cfg.kyber_discord_server_id,
                     inherit_checks=True,
