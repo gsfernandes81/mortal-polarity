@@ -91,12 +91,14 @@ class UrlPostSettings(BasePostSettings):
         Initialise the Url's redirect_target, last_modified and last_checked properties
         if they are set to None
         """
-        if not (
+        if (
             self.url_redirect_target == None
             or self.url_last_checked == None
             or self.url_last_modified == None
         ):
-            return
+            await self.update_url()
+
+    async def update_url(self):
         async with aiohttp.ClientSession() as session:
             async with session.get(self.url, allow_redirects=False) as resp:
                 self.url_redirect_target = resp.headers["Location"]
@@ -430,6 +432,9 @@ class ControlCommandsImpl:
                 settings: UrlPostSettings = await session.get(self.settings_table, 0)
                 if settings is None:
                     await ctx.respond("Please enable autoposts before using this cmd")
+                else:
+                    await settings.update_url()
+
                 channel_record_list = (
                     await session.execute(
                         select(self.autopost_channel_table).where(
