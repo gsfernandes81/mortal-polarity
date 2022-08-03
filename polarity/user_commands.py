@@ -25,7 +25,13 @@ from sqlalchemy.sql.expression import delete, select
 from sqlalchemy.sql.schema import Column
 
 from . import cfg, ls
-from .utils import Base, RefreshCmdListEvent, db_session, url_regex
+from .utils import (
+    Base,
+    RefreshCmdListEvent,
+    db_session,
+    follow_link_single_step,
+    url_regex,
+)
 
 command_registry = {}
 
@@ -307,20 +313,14 @@ async def user_command(ctx: lightbulb.Context):
                 )
             ).fetchone()[0]
     text = command.response.strip()
-    # Follow the redirects, check the extension, download only if it is a jgp
-    # Above to be implemented
+    # Follow redirects once if any
     links = url_regex.findall(text)
     redirected_links = []
     redirected_text = url_regex.sub("{}", text)
-    async with aiohttp.ClientSession() as session:
-        for link in links:
-            async with session.get(link, allow_redirects=False) as response:
-                redirected_links.append(str(response.headers["Location"]))
-                logging.info(
-                    "Replacing link: {} with redirect: {}".format(
-                        link, redirected_links[-1]
-                    )
-                )
+
+    for link in links:
+        redirected_links.append(await follow_link_single_step(link))
+
     redirected_text = redirected_text.format(*redirected_links)
 
     await ctx.respond(redirected_text)

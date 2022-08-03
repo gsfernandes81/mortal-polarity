@@ -99,29 +99,26 @@ class UrlPostSettings(BasePostSettings):
             await self.update_url()
 
     async def update_url(self):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self.url, allow_redirects=False) as resp:
-                self.url_redirect_target = resp.headers["Location"]
-                self.url_last_checked = dt.datetime.now()
-                self.url_last_modified = dt.datetime.now()
+        self.url_redirect_target = await follow_link_single_step(self.url)
+        self.url_last_checked = dt.datetime.now()
+        self.url_last_modified = dt.datetime.now()
 
     async def wait_for_url_update(self):
-        async with db_session() as db_session_:
-            async with db_session_.begin():
-                db_session_.add(self)
+        async with db_session() as session:
+            async with session.begin():
+                session.add(self)
                 self.url_watcher_armed = True
             check_interval = 10
-            async with aiohttp.ClientSession() as session:
-                while True:
-                    async with session.get(self.url, allow_redirects=False) as resp:
-                        if resp.headers["Location"] != self.url_redirect_target:
-                            async with db_session_.begin():
-                                db_session_.add(self)
-                                self.url_redirect_target = resp.headers["Location"]
-                                self.url_last_modified = dt.datetime.now()
-                                self.url_watcher_armed = False
-                            return self
-                        await asyncio.sleep(check_interval)
+            while True:
+                current_redirected_url = await follow_link_single_step(self.url)
+                if current_redirected_url != self.url_redirect_target:
+                    async with session.begin():
+                        session.add(self)
+                        self.url_redirect_target = current_redirected_url
+                        self.url_last_modified = dt.datetime.now()
+                        self.url_watcher_armed = False
+                    return self
+                await asyncio.sleep(check_interval)
 
     async def get_announce_embed(
         self, correction: str = "", date: dt.date = None

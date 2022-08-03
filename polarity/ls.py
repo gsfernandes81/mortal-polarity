@@ -30,7 +30,7 @@ from .autopost import (
     BasePostSettings,
     DailyResetSignal,
 )
-from .utils import Base, _create_or_get, db_session
+from .utils import Base, _create_or_get, db_session, follow_link_single_step
 
 
 class LostSectorPostSettings(BasePostSettings, Base):
@@ -45,11 +45,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
         )()
 
         # Follow the hyperlink to have the newest image embedded
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                rot.shortlink_gfx, allow_redirects=False
-            ) as response:
-                ls_gfx_url = str(response.headers["Location"])
+        ls_gfx_url = await follow_link_single_step(rot.shortlink_gfx)
 
         format_dict = {
             "month": month[date.month],

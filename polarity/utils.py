@@ -116,7 +116,7 @@ async def follow_link_single_step(url: str) -> str:
             except KeyError:
                 # If we can't find the location key, warn and return the
                 # provided url itself
-                logging.warning(
+                logging.info(
                     "Could not find redirect for url "
                     + "{}, returning as is".format(url)
                 )
