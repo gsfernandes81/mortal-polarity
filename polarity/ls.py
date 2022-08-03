@@ -127,7 +127,7 @@ async def ls_autoposts_kyber_ctrl_cmd(ctx: lightbulb.Context):
 )
 @lightbulb.implements(lightbulb.SlashSubCommand)
 async def ls_autoposts_kyber_trigger_cmd(ctx: lightbulb.Context):
-    ctx.bot.dispatch(LostSectorSignal)
+    ctx.bot.dispatch(LostSectorSignal(ctx.bot))
 
 
 def register(bot, usr_ctrl_cmd_group, kyber_ctrl_cmd_group):
