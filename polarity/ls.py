@@ -17,7 +17,6 @@ import datetime as dt
 from calendar import month_name as month
 from typing import Type
 
-import aiohttp
 import hikari
 import lightbulb
 from pytz import utc

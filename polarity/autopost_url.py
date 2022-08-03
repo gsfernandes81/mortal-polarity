@@ -21,23 +21,17 @@ import datetime as dt
 import functools
 import logging
 from calendar import month_name as month
-from typing import List, Type, Callable
+from typing import Callable, List, Type
 
-import aiohttp
 import hikari
 import lightbulb
 import lightbulb.ext.wtf as wtf
-from pytz import utc
 from sqlalchemy import Column, select
 from sqlalchemy.orm import declarative_mixin
 from sqlalchemy.types import Boolean, DateTime, String
 
 from . import cfg
-from .autopost import (
-    BaseChannelRecord,
-    BaseCustomEvent,
-    BasePostSettings,
-)
+from .autopost import BaseChannelRecord, BaseCustomEvent, BasePostSettings
 from .utils import (
     _create_or_get,
     _edit_embedded_message,
