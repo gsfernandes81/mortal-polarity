@@ -118,9 +118,22 @@ async def ls_autoposts_kyber_ctrl_cmd(ctx: lightbulb.Context):
     )
 
 
+@lightbulb.command(
+    "ls_manual",
+    "Manually trigger a lost sector announcement",
+    auto_defer=True,
+    # The following NEEDS to be included in all privledged commands
+    inherit_checks=True,
+)
+@lightbulb.implements(lightbulb.SlashSubCommand)
+async def ls_autoposts_kyber_trigger_cmd(ctx: lightbulb.Context):
+    ctx.bot.dispatch(LostSectorSignal)
+
+
 def register(bot, usr_ctrl_cmd_group, kyber_ctrl_cmd_group):
     LostSectorSignal(bot).arm()
     LostSectorAutopostChannel.register_with_bot(
         bot, usr_ctrl_cmd_group, LostSectorSignal
     )
     kyber_ctrl_cmd_group.child(ls_autoposts_kyber_ctrl_cmd)
+    kyber_ctrl_cmd_group.child(ls_autoposts_kyber_trigger_cmd)
