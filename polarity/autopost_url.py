@@ -99,9 +99,13 @@ class UrlPostSettings(BasePostSettings):
             await self.update_url()
 
     async def update_url(self):
-        self.url_redirect_target = await follow_link_single_step(self.url)
+        redirected_url = await follow_link_single_step(self.url)
         self.url_last_checked = dt.datetime.now()
-        self.url_last_modified = dt.datetime.now()
+        if redirected_url != self.url_redirect_target:
+            self.url_redirect_target = redirected_url
+            self.url_last_modified = self.url_last_checked
+        if self.url_last_modified == None:
+            self.url_last_modified = self.url_last_checked
 
     async def wait_for_url_update(self):
         async with db_session() as session:
@@ -123,14 +127,15 @@ class UrlPostSettings(BasePostSettings):
     async def get_announce_embed(
         self, correction: str = "", date: dt.date = None
     ) -> hikari.Embed:
-        # Use the current date if none is specified
+        await self.update_url()
+        # Use the db date if none is specified
         if date is None:
-            date = dt.datetime.now(tz=utc)
+            date = self.url_last_modified
         # Get the period of validity for this message
         start_date, end_date = self.validity_period(date)
         # Follow urls 1 step into redirects
-        gfx_url = await follow_link_single_step(self.url)
-        post_url = await follow_link_single_step(self.post_url)
+        gfx_url = self.url_redirect_target
+        post_url = self.post_url
 
         format_dict = {
             "start_month": month[start_date.month],
