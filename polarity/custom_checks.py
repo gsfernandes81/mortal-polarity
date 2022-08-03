@@ -30,7 +30,9 @@ async def _has_guild_permissions(
 
     channel = context.get_channel()
     if channel is None:
-        await context.bot.rest.fetch_channel(context.channel_id)
+        context.bot.cache.get_guild_channel(
+            context.channel_id
+        ) or await context.bot.rest.fetch_channel(context.channel_id)
 
     assert context.member is not None and isinstance(channel, hikari.GuildChannel)
     missing_perms = ~permissions.permissions_in(channel, context.member) & perms

@@ -130,7 +130,9 @@ async def _send_embed_if_textable_channel(
     channel_table,  # Must be the class of the channel, not an instance
 ) -> None:
     try:
-        channel = await event.bot.rest.fetch_channel(channel_id)
+        channel = event.bot.cache.get_channel(
+            channel_id
+        ) or await event.bot.rest.fetch_channel(channel_id)
         # Can add hikari.GuildNewsChannel for announcement channel support
         # could be useful if we automate more stuff for Kyber
         if isinstance(channel, hikari.TextableChannel):
@@ -160,7 +162,9 @@ async def _edit_embedded_message(
     embed: hikari.Embed,
 ) -> None:
     try:
-        msg: hikari.Message = await bot.rest.fetch_message(channel_id, message_id)
+        msg: hikari.Message = bot.cache.get_message(
+            message_id
+        ) or await bot.rest.fetch_message(channel_id, message_id)
         if isinstance(msg, hikari.Message):
             await msg.edit(content="", embed=embed)
     except (hikari.ForbiddenError, hikari.NotFoundError):

@@ -147,11 +147,17 @@ class BaseChannelRecord:
         bot: lightbulb.BotApp, channel: Union[hikari.TextableChannel, int]
     ) -> bool:
         if not isinstance(channel, hikari.TextableChannel):
-            channel = await bot.rest.fetch_channel(channel)
+            # Get channel from cache if possible
+            channel = bot.cache.get_guild_channel(
+                channel
+            ) or await bot.rest.fetch_channel(channel)
+
         if isinstance(channel, hikari.TextableChannel):
             if isinstance(channel, hikari.TextableGuildChannel):
-                guild = await channel.fetch_guild()
-                self_member = await bot.rest.fetch_member(guild, bot.get_me())
+                guild = channel.get_guild() or await channel.fetch_guild()
+                self_member = bot.cache.get_member(
+                    guild, bot.get_me()
+                ) or await bot.rest.fetch_member(guild, bot.get_me())
                 perms = lightbulb.utils.permissions_in(channel, self_member)
                 # Check if we have the send messages permission in the channel
                 # Refer to hikari.Permissions to see how / why this works
