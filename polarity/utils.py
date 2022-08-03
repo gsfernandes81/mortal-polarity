@@ -130,7 +130,7 @@ async def _send_embed_if_textable_channel(
     channel_table,  # Must be the class of the channel, not an instance
 ) -> None:
     try:
-        channel = event.bot.cache.get_channel(
+        channel = event.bot.cache.get_guild_channel(
             channel_id
         ) or await event.bot.rest.fetch_channel(channel_id)
         # Can add hikari.GuildNewsChannel for announcement channel support
