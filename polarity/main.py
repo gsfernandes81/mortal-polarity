@@ -36,7 +36,10 @@ uvloop.install()
 bot: lightbulb.BotApp = lightbulb.BotApp(**cfg.lightbulb_params)
 
 
-@tasks.task(m=30, auto_start=True, wait_before_execution=False)
+# Switch to running this task once per bot run
+# This is to work around an undiagnosed bug where the number of cumulative
+# users seems to go down the longer the bot is running
+@tasks.task(m=30, auto_start=True, wait_before_execution=False, max_executions=1)
 async def autoupdate_status():
     if not bot.d.has_lightbulb_started:
         await bot.wait_for(lightbulb.events.LightbulbStartedEvent, timeout=None)
