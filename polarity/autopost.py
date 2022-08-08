@@ -13,11 +13,11 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
-from abc import ABC, abstractmethod
 import asyncio
 import functools
 import logging
 import re
+from abc import ABC, abstractmethod
 from typing import Type, Union
 
 import hikari
@@ -28,8 +28,8 @@ from sqlalchemy.orm import declarative_mixin, declared_attr
 from sqlalchemy.sql.schema import Column
 
 from . import cfg, custom_checks
-from .utils import _send_embed, db_session, operation_timer
 from .controller import kyber as control_cmd_group
+from .utils import _send_embed, db_session, operation_timer
 
 app = web.Application()
 
