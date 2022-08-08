@@ -36,10 +36,7 @@ uvloop.install()
 bot: lightbulb.BotApp = lightbulb.BotApp(**cfg.lightbulb_params)
 
 
-# Switch to running this task once per bot run
-# This is to work around an undiagnosed bug where the number of cumulative
-# users seems to go down the longer the bot is running
-@tasks.task(m=30, auto_start=True, wait_before_execution=False, max_executions=1)
+@tasks.task(m=30, auto_start=True, wait_before_execution=False)
 async def autoupdate_status():
     if not bot.d.has_lightbulb_started:
         await bot.wait_for(lightbulb.events.LightbulbStartedEvent, timeout=None)
@@ -49,7 +46,7 @@ async def autoupdate_status():
     for guild in bot.cache.get_guilds_view():
         if isinstance(guild, hikari.Snowflake):
             guild = await bot.rest.fetch_guild(guild)
-        total_users_approx += guild.approximate_active_member_count or 0
+        total_users_approx += guild.approximate_member_count or 0
     await bot.update_presence(
         activity=hikari.Activity(
             name="{} users : )".format(total_users_approx),
