@@ -260,7 +260,7 @@ class ControlCommandsImpl:
             wtf.Description[
                 "{} announcement management".format(self.announcement_name)
             ],
-            wtf.Guilds[cfg.kyber_discord_server_id],
+            wtf.Guilds[cfg.control_discord_server_id],
             wtf.InheritChecks[True],
             wtf.Subcommands[
                 # Autoposts Enable/Disable

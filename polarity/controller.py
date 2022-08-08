@@ -23,7 +23,7 @@ from . import cfg
     "kyber",
     "Commands for Kyber",
     guilds=[
-        cfg.kyber_discord_server_id,
+        cfg.control_discord_server_id,
     ],
 )
 @lightbulb.implements(lightbulb.SlashCommandGroup)

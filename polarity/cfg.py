@@ -47,6 +47,12 @@ trigger_without_url_update = (
 admin_role = int(_getenv("ADMIN_ROLE"))
 
 kyber_discord_server_id = int(_getenv("KYBER_DISCORD_SERVER_ID"))
+control_discord_server_id = int(_getenv("CONTROL_DISCORD_SERVER_ID", default=0))
+control_discord_server_id = (
+    control_discord_server_id
+    if control_discord_server_id != 0
+    else kyber_discord_server_id
+)
 
 lightbulb_params = (
     # Only use the test env for testing if it is specified

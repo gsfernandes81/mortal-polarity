@@ -100,7 +100,7 @@ class BaseChannelRecord:
                     cls.control_command_name.lower().replace(" ", "_"),
                     "{} auto posts".format(cls.control_command_name.capitalize()),
                     auto_defer=True,
-                    guilds=cfg.kyber_discord_server_id,
+                    guilds=cfg.control_discord_server_id,
                     inherit_checks=True,
                 )(
                     lightbulb.implements(lightbulb.SlashSubCommand)(

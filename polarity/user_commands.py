@@ -59,7 +59,7 @@ class Commands(Base):
     "add",
     "Add a command to the bot",
     auto_defer=True,
-    guilds=(cfg.kyber_discord_server_id,),
+    guilds=(cfg.control_discord_server_id,),
 )
 @lightbulb.implements(lightbulb.SlashCommand)
 async def add_command(ctx: lightbulb.Context) -> None:
@@ -109,7 +109,7 @@ async def add_command(ctx: lightbulb.Context) -> None:
     "delete",
     "Delete a command from the bot",
     auto_defer=True,
-    guilds=(cfg.kyber_discord_server_id,),
+    guilds=(cfg.control_discord_server_id,),
 )
 @lightbulb.implements(lightbulb.SlashCommand)
 async def del_command(ctx: lightbulb.Context) -> None:
@@ -162,7 +162,7 @@ async def del_command(ctx: lightbulb.Context) -> None:
     "edit",
     "Edit a command",
     auto_defer=True,
-    guilds=(cfg.kyber_discord_server_id,),
+    guilds=(cfg.control_discord_server_id,),
 )
 @lightbulb.implements(lightbulb.SlashCommand)
 async def edit_command(ctx: lightbulb.Context):
