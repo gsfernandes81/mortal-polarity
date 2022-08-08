@@ -24,6 +24,7 @@ from sector_accounting import Rotation
 
 from . import cfg
 from .autopost import (
+    AutopostsBase,
     BaseChannelRecord,
     BaseCustomEvent,
     BasePostSettings,
@@ -130,10 +131,14 @@ async def ls_autoposts_kyber_trigger_cmd(ctx: lightbulb.Context):
     ctx.bot.dispatch(LostSectorSignal(ctx.bot))
 
 
-def register(bot, usr_ctrl_cmd_group, kyber_ctrl_cmd_group):
-    LostSectorSignal(bot).arm()
-    LostSectorAutopostChannel.register_with_bot(
-        bot, usr_ctrl_cmd_group, LostSectorSignal
-    )
-    kyber_ctrl_cmd_group.child(ls_autoposts_kyber_ctrl_cmd)
-    kyber_ctrl_cmd_group.child(ls_autoposts_kyber_trigger_cmd)
+class LostSectors(AutopostsBase):
+    def register(self, bot: lightbulb.BotApp) -> None:
+        LostSectorSignal(bot).arm()
+        LostSectorAutopostChannel.register(
+            bot, self.autopost_cmd_group, LostSectorSignal
+        )
+        self.control_cmd_group.child(ls_autoposts_kyber_ctrl_cmd)
+        self.control_cmd_group.child(ls_autoposts_kyber_trigger_cmd)
+
+
+lost_sectors = LostSectors()

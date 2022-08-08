@@ -17,7 +17,7 @@ from . import cfg
 from .autopost import WeeklyResetSignal
 from .autopost_url import (
     BaseUrlSignal,
-    ControlCommandsImpl,
+    UrlAutopostsBase,
     UrlAutopostChannel,
     UrlPostSettings,
 )
@@ -47,10 +47,11 @@ class WeeklyResetPostSignal(BaseUrlSignal):
     trigger_on_signal = WeeklyResetSignal
 
 
-class WeeklyResetPostControlCommands(ControlCommandsImpl):
-    announcement_name = "Reset"
-    settings_table = WeeklyResetPostSettings
-    autopost_channel_table = WeeklyResetAutopostChannel
-    autopost_trigger_signal = WeeklyResetPostSignal
-    default_gfx_url = cfg.defaults.weekly_reset.gfx_url
-    default_post_url = cfg.defaults.weekly_reset.post_url
+weekly_reset = UrlAutopostsBase(
+    settings_table=WeeklyResetPostSettings,
+    channel_table=WeeklyResetAutopostChannel,
+    autopost_trigger_signal=WeeklyResetPostSignal,
+    default_gfx_url=cfg.defaults.weekly_reset.gfx_url,
+    default_post_url=cfg.defaults.weekly_reset.post_url,
+    announcement_name="Reset",
+)

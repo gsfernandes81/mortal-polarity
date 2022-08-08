@@ -17,7 +17,7 @@ from . import cfg
 from .autopost import WeekendResetSignal
 from .autopost_url import (
     BaseUrlSignal,
-    ControlCommandsImpl,
+    UrlAutopostsBase,
     UrlAutopostChannel,
     UrlPostSettings,
 )
@@ -46,10 +46,11 @@ class XurSignal(BaseUrlSignal):
     trigger_on_signal = WeekendResetSignal
 
 
-class XurControlCommands(ControlCommandsImpl):
-    announcement_name = "Xur"
-    settings_table = XurPostSettings
-    autopost_channel_table = XurAutopostChannel
-    autopost_trigger_signal = XurSignal
-    default_gfx_url = cfg.defaults.xur.gfx_url
-    default_post_url = cfg.defaults.xur.post_url
+xur = UrlAutopostsBase(
+    settings_table=XurPostSettings,
+    channel_table=XurAutopostChannel,
+    autopost_trigger_signal=XurSignal,
+    default_gfx_url=cfg.defaults.xur.gfx_url,
+    default_post_url=cfg.defaults.xur.post_url,
+    announcement_name="Xur",
+)

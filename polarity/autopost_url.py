@@ -31,7 +31,12 @@ from sqlalchemy.orm import declarative_mixin
 from sqlalchemy.types import Boolean, DateTime, String
 
 from . import cfg
-from .autopost import BaseChannelRecord, BaseCustomEvent, BasePostSettings
+from .autopost import (
+    AutopostsBase,
+    BaseChannelRecord,
+    BaseCustomEvent,
+    BasePostSettings,
+)
 from .utils import (
     _create_or_get,
     _edit_embedded_message,
@@ -213,45 +218,42 @@ class BaseUrlSignal(BaseCustomEvent):
         await settings.wait_for_url_update()
 
 
-class ControlCommandsImpl:
-    settings_table: Type[UrlPostSettings]
-    autopost_channel_table: Type[UrlAutopostChannel]
-    autopost_trigger_signal: Type[BaseUrlSignal]
-    default_gfx_url: str
-    default_post_url: str
-    announcement_name: str
+class UrlAutopostsBase(AutopostsBase):
     _partials_applied = False
 
-    def __init__(self):
-        if self._partials_applied:
-            self.autopost_ctrl = functools.partial(self.autopost_ctrl, self)
-            self.gfx_url = functools.partial(self.gfx_url, self)
-            self.post_url = functools.partial(self.post_url, self)
-            self.rectify_announcement = functools.partial(
-                self.rectify_announcement, self
-            )
-            self.manual_announce = functools.partial(self.manual_announce, self)
-            self._partials_applied = True
+    def __init__(
+        self,
+        settings_table: Type[UrlPostSettings],
+        channel_table: Type[UrlAutopostChannel],
+        autopost_trigger_signal: Type[BaseUrlSignal],
+        default_gfx_url: str,
+        default_post_url: str,
+        announcement_name: str,
+    ):
+        super().__init__()
+        self.settings_table = settings_table
+        self.autopost_channel_table = channel_table
+        self.autopost_trigger_signal = autopost_trigger_signal
+        self.default_gfx_url = default_gfx_url
+        self.default_post_url = default_post_url
+        self.announcement_name = announcement_name
 
     def register(
         self,
         bot: lightbulb.BotApp,
-        usr_ctrl_cmd_group: lightbulb.SlashCommandGroup,
-        kyber_ctrl_cmd_group: lightbulb.SlashCommandGroup,
     ):
         try:
-            self.autopost_channel_table.register_with_bot(
-                bot, usr_ctrl_cmd_group, self.autopost_trigger_signal
+            self.autopost_channel_table.register(
+                bot, self.autopost_cmd_group, self.autopost_trigger_signal
             )
             self.settings_table.register_embed_user_cmd(bot)
-            kyber_ctrl_cmd_group.child(self.commands_from_impl_struct(self))
+            self.control_cmd_group.child(self.commands_from_impl_struct())
             self.autopost_trigger_signal(bot).arm()
         except lightbulb.CommandAlreadyExists:
             pass
         finally:
             return self
 
-    @staticmethod
     def commands_from_impl_struct(self) -> lightbulb.SlashCommandGroup:
         # Announcement management commands for kyber
         return wtf.Command[

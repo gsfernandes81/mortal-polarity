@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
+from abc import ABC, abstractmethod
 import asyncio
 import functools
 import logging
@@ -28,6 +29,7 @@ from sqlalchemy.sql.schema import Column
 
 from . import cfg, custom_checks
 from .utils import _send_embed, db_session, operation_timer
+from .controller import kyber as control_cmd_group
 
 app = web.Application()
 
@@ -77,7 +79,7 @@ class BaseChannelRecord:
         self.enabled = enabled
 
     @classmethod
-    def register_with_bot(
+    def register(
         cls,
         bot: lightbulb.BotApp,
         cmd_group: lightbulb.SlashCommandGroup,
@@ -307,12 +309,25 @@ async def start_signal_receiver(event: hikari.StartedEvent) -> None:
     await site.start()
 
 
-def register(bot: lightbulb.BotApp) -> None:
-    # Arm all signals
-    DailyResetSignal(bot).arm()
-    WeeklyResetSignal(bot).arm()
-    WeekendResetSignal(bot).arm()
-    bot.listen(hikari.StartedEvent)(start_signal_receiver)
+class AutopostsBase(ABC):
+    def __init__(self):
+        self.autopost_cmd_group = autopost_cmd_group
+        self.control_cmd_group = control_cmd_group
 
-    # Connect commands
-    bot.command(autopost_cmd_group)
+    @abstractmethod
+    def register(self, bot: lightbulb.BotApp) -> None:
+        pass
+
+
+class Autoposts(AutopostsBase):
+    def register(self, bot: lightbulb.BotApp) -> None:
+        DailyResetSignal(bot).arm()
+        WeeklyResetSignal(bot).arm()
+        WeekendResetSignal(bot).arm()
+        bot.listen(hikari.StartedEvent)(start_signal_receiver)
+
+        # Connect commands
+        bot.command(self.autopost_cmd_group)
+
+
+autoposts = Autoposts()

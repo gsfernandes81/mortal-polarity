@@ -290,7 +290,7 @@ async def on_error(event: lightbulb.CommandErrorEvent):
         raise event.exception.__cause__ or event.exception
 
 
-def register_all(bot: lightbulb.BotApp):
+def register(bot: lightbulb.BotApp):
     # Register all commands and listeners with the bot
     for command in [add_command, del_command, edit_command, ls_command]:
         bot.command(command)
