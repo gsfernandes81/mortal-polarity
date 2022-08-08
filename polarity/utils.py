@@ -123,11 +123,12 @@ async def follow_link_single_step(url: str) -> str:
                 return url
 
 
-async def _send_embed_if_textable_channel(
+async def _send_embed(
     channel_id: int,
     event: hikari.Event,
     embed: hikari.Embed,
     channel_table,  # Must be the class of the channel, not an instance
+    announce_if_guild=-1,  # Announce if channel is in this guild
 ) -> None:
     try:
         channel = event.bot.cache.get_guild_channel(
@@ -139,7 +140,11 @@ async def _send_embed_if_textable_channel(
             async with db_session() as session:
                 async with session.begin():
                     channel_record = await session.get(channel_table, channel_id)
-                    channel_record.last_msg_id = await channel.send(embed=embed)
+                    message = await channel.send(embed=embed)
+                    channel_record.last_msg_id = message.id
+                    if channel_record.server_id == announce_if_guild:
+                        await event.bot.rest.crosspost_message(channel, message)
+
     except (hikari.ForbiddenError, hikari.NotFoundError):
         logging.warning(
             "Channel {} not found or not messageable, disabling posts in {}".format(
@@ -160,6 +165,7 @@ async def _edit_embedded_message(
     channel_id: int,
     bot: hikari.GatewayBot,
     embed: hikari.Embed,
+    announce_if_guild: int = -1,
 ) -> None:
     try:
         msg: hikari.Message = bot.cache.get_message(
@@ -167,5 +173,13 @@ async def _edit_embedded_message(
         ) or await bot.rest.fetch_message(channel_id, message_id)
         if isinstance(msg, hikari.Message):
             await msg.edit(content="", embed=embed)
+            try:
+                if msg.guild_id == announce_if_guild:
+                    await bot.rest.crosspost_message(channel_id, msg)
+            except AttributeError:
+                pass
+            except hikari.BadRequestError as err:
+                if not ("This message has already been crossposted" in str(err)):
+                    raise err
     except (hikari.ForbiddenError, hikari.NotFoundError):
         logging.warning("Message {} not found or not editable".format(message_id))
