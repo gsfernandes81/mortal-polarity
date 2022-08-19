@@ -13,14 +13,18 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
+import asyncio
 import datetime as dt
+import logging
 from calendar import month_name as month
-from typing import Type
+from typing import List, Type
 
 import hikari
 import lightbulb
+from lightbulb.ext import wtf
 from pytz import utc
 from sector_accounting import Rotation
+from sqlalchemy import select
 
 from . import cfg
 from .autopost import (
@@ -30,7 +34,14 @@ from .autopost import (
     BasePostSettings,
     DailyResetSignal,
 )
-from .utils import Base, _create_or_get, db_session, follow_link_single_step
+from .utils import (
+    Base,
+    _create_or_get,
+    _edit_embedded_message,
+    db_session,
+    follow_link_single_step,
+    operation_timer,
+)
 
 
 class LostSectorPostSettings(BasePostSettings, Base):
@@ -89,22 +100,7 @@ class LostSectorSignal(BaseCustomEvent):
         self.bot.listen()(self.conditional_daily_reset_repeater)
 
 
-@lightbulb.option(
-    "option",
-    "Enable or disable",
-    type=str,
-    choices=["Enable", "Disable"],
-    required=True,
-)
-@lightbulb.command(
-    "ls_announcements",
-    "Enable or disable all automatic lost sector announcements",
-    auto_defer=True,
-    # The following NEEDS to be included in all privledged commands
-    inherit_checks=True,
-)
-@lightbulb.implements(lightbulb.SlashSubCommand)
-async def ls_autoposts_kyber_ctrl_cmd(ctx: lightbulb.Context):
+async def ls_control(ctx: lightbulb.Context):
     option = True if ctx.options.option.lower() == "enable" else False
     async with db_session() as session:
         async with session.begin():
@@ -119,26 +115,114 @@ async def ls_autoposts_kyber_ctrl_cmd(ctx: lightbulb.Context):
     )
 
 
-@lightbulb.command(
-    "ls_manual",
-    "Manually trigger a lost sector announcement",
-    auto_defer=True,
-    # The following NEEDS to be included in all privledged commands
-    inherit_checks=True,
-)
-@lightbulb.implements(lightbulb.SlashSubCommand)
-async def ls_autoposts_kyber_trigger_cmd(ctx: lightbulb.Context):
+async def ls_announce(ctx: lightbulb.Context):
     ctx.bot.dispatch(LostSectorSignal(ctx.bot))
+    await ctx.respond("Announcing now")
 
 
 class LostSectors(AutopostsBase):
+    def __init__(self):
+        super().__init__()
+        self.settings_table = LostSectorPostSettings
+        self.autopost_channel_table = LostSectorAutopostChannel
+
     def register(self, bot: lightbulb.BotApp) -> None:
         LostSectorSignal(bot).arm()
         LostSectorAutopostChannel.register(
             bot, self.autopost_cmd_group, LostSectorSignal
         )
-        self.control_cmd_group.child(ls_autoposts_kyber_ctrl_cmd)
-        self.control_cmd_group.child(ls_autoposts_kyber_trigger_cmd)
+        logging.warning(self.autopost_cmd_group)
+        self.control_cmd_group.child(self.commands())
+
+    def commands(self):
+        return wtf.Command[
+            wtf.Implements[lightbulb.SlashSubGroup],
+            wtf.Name["ls"],
+            wtf.Description["Lost sector announcement management"],
+            wtf.Guilds[cfg.control_discord_server_id],
+            wtf.InheritChecks[True],
+            wtf.Subcommands[
+                wtf.Command[
+                    wtf.Name["autoposts"],
+                    wtf.Description["Enable or disable automatic announcements"],
+                    wtf.AutoDefer[True],
+                    wtf.InheritChecks[True],
+                    wtf.Options[
+                        wtf.Option[
+                            wtf.Name["option"],
+                            wtf.Description["Enable or disable"],
+                            wtf.Type[str],
+                            wtf.Choices["Enable", "Disable"],
+                            wtf.Required[True],
+                        ],
+                    ],
+                    wtf.Implements[lightbulb.SlashSubCommand],
+                    wtf.Executes[ls_control],
+                ],
+                wtf.Command[
+                    wtf.Name["update"],
+                    wtf.Description[
+                        "Update a lost sector post, optionally with text saying what has changed"
+                    ],
+                    wtf.Executes[self.update],
+                    wtf.InheritChecks[True],
+                    wtf.Implements[lightbulb.SlashSubCommand],
+                ],
+                wtf.Command[
+                    wtf.Name["announce"],
+                    wtf.Description["Trigger an announcement manually"],
+                    wtf.AutoDefer[True],
+                    wtf.InheritChecks[True],
+                    wtf.Implements[lightbulb.SlashSubCommand],
+                    wtf.Executes[ls_announce],
+                ],
+            ],
+        ]
+
+    async def update(self, ctx: lightbulb.Context):
+        """Correct a mistake in the announcement"""
+        change = ctx.options.change if ctx.options.change else ""
+        async with db_session() as session:
+            async with session.begin():
+                settings: LostSectorPostSettings = await session.get(
+                    self.settings_table, 0
+                )
+                if settings is None:
+                    await ctx.respond("Please enable autoposts before using this cmd")
+
+                channel_record_list = (
+                    await session.execute(
+                        select(self.autopost_channel_table).where(
+                            self.autopost_channel_table.enabled == True
+                        )
+                    )
+                ).fetchall()
+                channel_record_list = (
+                    [] if channel_record_list is None else channel_record_list
+                )
+                channel_record_list: List[BaseChannelRecord] = [
+                    channel[0] for channel in channel_record_list
+                ]
+            logging.info("Correcting posts")
+            with operation_timer("Announce correction"):
+                await ctx.respond("Correcting posts now")
+                embed = await settings.get_announce_embed(
+                    change,
+                )
+                await asyncio.gather(
+                    *[
+                        _edit_embedded_message(
+                            channel_record.last_msg_id,
+                            channel_record.id,
+                            ctx.bot,
+                            embed,
+                            announce_if_guild=cfg.kyber_discord_server_id,
+                        )
+                        for channel_record in channel_record_list
+                    ],
+                    return_exceptions=True
+                )
+                await ctx.edit_last_response("Posts corrected")
 
 
 lost_sectors = LostSectors()

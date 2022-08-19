@@ -245,14 +245,14 @@ class UrlAutopostsBase(AutopostsBase):
                 bot, self.autopost_cmd_group, self.autopost_trigger_signal
             )
             self.settings_table.register_embed_user_cmd(bot)
-            self.control_cmd_group.child(self.commands_from_impl_struct())
+            self.control_cmd_group.child(self.commands())
             self.autopost_trigger_signal(bot).arm()
         except lightbulb.CommandAlreadyExists:
             pass
         finally:
             return self
 
-    def commands_from_impl_struct(self) -> lightbulb.SlashCommandGroup:
+    def commands(self) -> lightbulb.SlashCommandGroup:
         # Announcement management commands for kyber
         return wtf.Command[
             wtf.Implements[lightbulb.SlashSubGroup],
@@ -266,9 +266,7 @@ class UrlAutopostsBase(AutopostsBase):
                 # Autoposts Enable/Disable
                 wtf.Command[
                     wtf.Name["autoposts"],
-                    wtf.Description[
-                        "Enable or disable all automatic lost sector announcements"
-                    ],
+                    wtf.Description["Enable or disable automatic announcements"],
                     wtf.AutoDefer[True],
                     wtf.InheritChecks[True],
                     wtf.Options[
