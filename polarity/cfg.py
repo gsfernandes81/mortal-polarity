@@ -45,6 +45,7 @@ trigger_without_url_update = (
 )
 
 admin_role = int(_getenv("ADMIN_ROLE"))
+alerts_channel_id = int(_getenv("ALERTS_CHANNEL_ID"))
 
 kyber_discord_server_id = int(_getenv("KYBER_DISCORD_SERVER_ID"))
 control_discord_server_id = int(_getenv("CONTROL_DISCORD_SERVER_ID", default=0))
@@ -53,6 +54,11 @@ control_discord_server_id = (
     if control_discord_server_id != 0
     else kyber_discord_server_id
 )
+
+tw_cons_key = str(_getenv("TWITTER_CONSUMER_KEY"))
+tw_cons_secret = str(_getenv("TWITTER_CONSUMER_SECRET"))
+tw_access_tok = str(_getenv("TWITTER_ACCESS_TOKEN"))
+tw_access_tok_secret = str(_getenv("TWITTER_ACCESS_TOKEN_SECRET"))
 
 lightbulb_params = (
     # Only use the test env for testing if it is specified

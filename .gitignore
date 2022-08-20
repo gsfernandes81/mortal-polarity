@@ -130,3 +130,7 @@ dmypy.json
 
 # ToDo
 ToDo
+
+# Image files from the _download_linked_image function
+*.jpg
+*.png

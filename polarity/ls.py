@@ -17,10 +17,11 @@ import asyncio
 import datetime as dt
 import logging
 from calendar import month_name as month
-from typing import List, Type
+from typing import List, Tuple, Type
 
 import hikari
 import lightbulb
+import tweepy
 from lightbulb.ext import wtf
 from pytz import utc
 from sector_accounting import Rotation
@@ -37,7 +38,10 @@ from .autopost import (
 from .utils import (
     Base,
     _create_or_get,
+    _discord_alert,
+    _download_linked_image,
     _edit_embedded_message,
+    _run_in_thread_pool,
     db_session,
     follow_link_single_step,
     operation_timer,
@@ -45,6 +49,18 @@ from .utils import (
 
 
 class LostSectorPostSettings(BasePostSettings, Base):
+    twitter_ls_post_string = (
+        "Daily Lost Sector for {month} {day}\n"
+        + "(kyber3000.com/LS)\n\n"
+        + "{sector.name}:\n"
+        + "• Exotic Reward (If Solo): {sector.reward}\n"
+        + "• Champs: {sector.champions}\n"
+        + "• Shields: {sector.shields}\n"
+        + "• Burn: {sector.burn}\n"
+        + "• Modifiers: {sector.modifiers}\n\n"
+        + "#Destiny2"
+    )
+
     async def get_announce_embed(self, date: dt.date = None) -> hikari.Embed:
         buffer = 1  # Minute
         if date is None:
@@ -79,6 +95,20 @@ class LostSectorPostSettings(BasePostSettings, Base):
             ).format(**format_dict),
             color=cfg.kyber_pink,
         ).set_image(ls_gfx_url)
+
+    async def get_twitter_data_tuple(self, date: dt.date = None) -> Tuple[str, str]:
+        date = date or dt.datetime.now(tz=utc)
+        rot = Rotation.from_gspread_url(
+            cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=1  # minutes
+        )()
+        return (
+            self.twitter_ls_post_string.format(
+                sector=rot,
+                month=month[date.month],
+                day=date.day,
+            ),
+            await _download_linked_image(rot.shortlink_gfx),
+        )
 
 
 class LostSectorAutopostChannel(BaseChannelRecord, Base):
@@ -125,6 +155,15 @@ class LostSectors(AutopostsBase):
         super().__init__()
         self.settings_table = LostSectorPostSettings
         self.autopost_channel_table = LostSectorAutopostChannel
+        # Create the twitter object:
+        self._twitter = tweepy.API(
+            tweepy.OAuth1UserHandler(
+                cfg.tw_cons_key,
+                cfg.tw_cons_secret,
+                cfg.tw_access_tok,
+                cfg.tw_access_tok_secret,
+            )
+        )
 
     def register(self, bot: lightbulb.BotApp) -> None:
         LostSectorSignal(bot).arm()
@@ -133,6 +172,7 @@ class LostSectors(AutopostsBase):
         )
         logging.warning(self.autopost_cmd_group)
         self.control_cmd_group.child(self.commands())
+        bot.listen(LostSectorSignal)(self.announce_to_twitter)
 
     def commands(self):
         return wtf.Command[
@@ -223,6 +263,49 @@ class LostSectors(AutopostsBase):
                     return_exceptions=True
                 )
                 await ctx.edit_last_response("Posts corrected")
+
+    async def announce_to_twitter(self, event):
+        try:
+            async with db_session() as session:
+                async with session.begin():
+                    settings: LostSectorPostSettings = await session.get(
+                        self.settings_table, 0
+                    )
+                    tweet_string, file_name = await settings.get_twitter_data_tuple()
+            await _run_in_thread_pool(
+                self._announce_to_twitter_sync,
+                tweet_string,
+                file_name,
+            )
+        except ValueError as err:
+            _discord_alert(err.args[0], channel=cfg.alerts_channel_id, bot=event.bot)
+
+    def _announce_to_twitter_sync(self, tweet_string, attachment_file_name=None):
+        if len(tweet_string) > 280:
+            raise ValueError(
+                "Lost sector post Tweet length more than 280 characters, not posting"
+            )
+        # If we have a lost sector graphic, the file name will not be none
+        # and we can upload this graphic to twitter and use it
+        if attachment_file_name != None:
+            # Upload the lost sector image
+            media_id = int(
+                self._twitter.media_upload(
+                    filename=attachment_file_name,
+                ).media_id
+            )
+
+            # Use the lost sector image in the tweet
+            self._twitter.update_status(
+                tweet_string,
+                media_ids=[media_id],
+            )
+        # If we don't have a lost sector graphic, we can't use it of course
+        # so we proceed with a text only tweet
+        else:
+            self._twitter.update_status(
+                tweet_string,
+            )
 
 
 lost_sectors = LostSectors()

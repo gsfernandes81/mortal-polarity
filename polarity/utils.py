@@ -13,14 +13,20 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
+import asyncio
+import concurrent.futures
 import contextlib
 import datetime as dt
+import functools
 import logging
 import re
-from typing import Tuple
+from typing import List, Tuple, Union
 
+import aiofiles
 import aiohttp
 import hikari
+import lightbulb
+import yarl
 from pytz import utc
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -183,3 +189,77 @@ async def _edit_embedded_message(
                     raise err
     except (hikari.ForbiddenError, hikari.NotFoundError):
         logging.warning("Message {} not found or not editable".format(message_id))
+
+
+async def _download_linked_image(url: str) -> str:
+    # Returns the name of the downloaded image
+    # Throws an aiohttp.client_exceptions.InvalidURL on
+    # an invalid url
+    # ToDo: Implement a per URL lock on this function
+    #       Also implement a naming scheme based on path
+    #       And implement a name size limit as required
+    async with aiohttp.ClientSession() as session:
+        backoff_timer = 1
+        while True:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    name = _get_uri_name(resp.url)
+                    f = await aiofiles.open(name, mode="wb")
+                    await f.write(await resp.read())
+                    await f.close()
+                    return name
+                else:
+                    await asyncio.sleep(backoff_timer)
+                    backoff_timer = backoff_timer + (1 / backoff_timer)
+
+
+def _get_uri_name(url: str) -> str:
+    return yarl.URL(url).name
+
+
+async def _run_in_thread_pool(func, *args, **kwargs):
+    # Apply arguments without executing with functools partial
+    partial_func = functools.partial(func, *args, **kwargs)
+    # Execute in thread pool
+    future = asyncio.get_event_loop().run_in_executor(
+        concurrent.futures.ThreadPoolExecutor(), partial_func
+    )
+    await future
+    exception = future.exception()
+    if exception is not None:
+        raise exception
+
+
+async def _discord_alert(
+    *args: str,
+    bot: lightbulb.BotApp = None,
+    channel: Union[None, int, hikari.TextableChannel],
+    mention_mods: bool = True,
+):
+    # Sends an alert in the specified channels
+    # logs the same alert
+    # If no channels specified, returns the alert string
+    alert = ""
+
+    for arg in args:
+        alert = alert + " " + str(arg)
+
+    if mention_mods:
+        alert = alert + "<@&{}> ".format(cfg.admin_role)
+
+    alert = "Warning: " + alert
+
+    logging.warning(alert)
+
+    # If we get a single channel, turn it into a len() = 1 list
+    if isinstance(channel, int):
+        if bot is None:
+            raise ValueError("bot needs to be specified if channel is int")
+        channel = bot.cache.get_guild_channel(channel) or await bot.rest.fetch_channel(
+            channel
+        )
+    elif channel is None:
+        return alert
+
+    # Send the alert in the channel
+    await channel.send(alert)
