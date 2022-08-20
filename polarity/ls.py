@@ -170,7 +170,6 @@ class LostSectors(AutopostsBase):
         LostSectorAutopostChannel.register(
             bot, self.autopost_cmd_group, LostSectorSignal
         )
-        logging.warning(self.autopost_cmd_group)
         self.control_cmd_group.child(self.commands())
         bot.listen(LostSectorSignal)(self.announce_to_twitter)
 
