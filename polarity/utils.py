@@ -244,10 +244,10 @@ async def _discord_alert(
     for arg in args:
         alert = alert + " " + str(arg)
 
+    alert = "Warning:" + alert + " "
+
     if mention_mods:
         alert = alert + "<@&{}> ".format(cfg.admin_role)
-
-    alert = "Warning: " + alert
 
     logging.warning(alert)
 
