@@ -262,4 +262,4 @@ async def _discord_alert(
         return alert
 
     # Send the alert in the channel
-    await channel.send(alert)
+    await channel.send(alert, role_mentions=True)
