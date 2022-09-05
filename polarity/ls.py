@@ -58,7 +58,6 @@ class LostSectorPostSettings(BasePostSettings, Base):
         + "• Shields: {sector.shields}\n"
         + "• Burn: {sector.burn}\n"
         + "• Modifiers: {sector.modifiers}\n\n"
-        + "#Destiny2"
     )
 
     async def get_announce_embed(self, date: dt.date = None) -> hikari.Embed:
