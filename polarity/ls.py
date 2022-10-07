@@ -246,9 +246,7 @@ class LostSectors(AutopostsBase):
             logging.info("Correcting posts")
             with operation_timer("Announce correction"):
                 await ctx.respond("Correcting posts now")
-                embed = await settings.get_announce_embed(
-                    change,
-                )
+                embed = await settings.get_announce_embed()
 
                 no_of_channels = len(channel_record_list)
                 percentage_progress = 0
