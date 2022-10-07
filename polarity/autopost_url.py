@@ -448,19 +448,21 @@ class UrlAutopostsBase(AutopostsBase):
                 embed = await settings.get_announce_embed(
                     change,
                 )
-                await asyncio.gather(
-                    *[
-                        _edit_embedded_message(
-                            channel_record.last_msg_id,
-                            channel_record.id,
-                            ctx.bot,
-                            embed,
-                            announce_if_guild=cfg.kyber_discord_server_id,
+                no_of_channels = len(channel_record_list)
+                percentage_progress = 0
+                for idx, channel_record in enumerate(channel_record_list):
+                    await _edit_embedded_message(
+                        channel_record.last_msg_id,
+                        channel_record.id,
+                        ctx.bot,
+                        embed,
+                        announce_if_guild=cfg.kyber_discord_server_id,
+                    )
+                    if percentage_progress > round(20 * (idx + 1) / no_of_channels) * 5:
+                        percentage_progress = round(20 * (idx + 1) / no_of_channels) * 5
+                        await ctx.edit_last_response(
+                            "Updating posts: {}%".format(percentage_progress)
                         )
-                        for channel_record in channel_record_list
-                    ],
-                    return_exceptions=True
-                )
                 await ctx.edit_last_response("Posts corrected")
 
     # Manually trigger an announcement event
