@@ -450,7 +450,13 @@ class UrlAutopostsBase(AutopostsBase):
                 )
                 no_of_channels = len(channel_record_list)
                 percentage_progress = 0
+                none_counter = 0
                 for idx, channel_record in enumerate(channel_record_list):
+
+                    if channel_record.last_msg_id is None:
+                        none_counter += 1
+                        continue
+
                     await _edit_embedded_message(
                         channel_record.last_msg_id,
                         channel_record.id,
@@ -461,7 +467,9 @@ class UrlAutopostsBase(AutopostsBase):
                     if percentage_progress > round(20 * (idx + 1) / no_of_channels) * 5:
                         percentage_progress = round(20 * (idx + 1) / no_of_channels) * 5
                         await ctx.edit_last_response(
-                            "Updating posts: {}%".format(percentage_progress)
+                            "Updating posts: {}%\nNone/passed/tot: {}/{}/{}".format(
+                                percentage_progress, none_counter, idx, no_of_channels
+                            )
                         )
                 await ctx.edit_last_response("Posts corrected")
 
