@@ -454,6 +454,7 @@ class UrlAutopostsBase(AutopostsBase):
                 for idx, channel_record in enumerate(channel_record_list):
 
                     if channel_record.last_msg_id is None:
+                        none_counter += 1
                         continue
 
                     await _edit_embedded_message(
@@ -463,12 +464,15 @@ class UrlAutopostsBase(AutopostsBase):
                         embed,
                         announce_if_guild=cfg.kyber_discord_server_id,
                     )
+
                     if percentage_progress < round(20 * (idx + 1) / no_of_channels) * 5:
                         percentage_progress = round(20 * (idx + 1) / no_of_channels) * 5
                         await ctx.edit_last_response(
                             "Updating posts: {}%\n".format(percentage_progress)
                         )
-                await ctx.edit_last_response("Posts corrected")
+                await ctx.edit_last_response(
+                    "{} posts corrected".format(no_of_channels - none_counter)
+                )
 
     # Manually trigger an announcement event
     async def manual_announce(self, ctx: lightbulb.Context):
