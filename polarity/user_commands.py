@@ -15,6 +15,7 @@
 
 # End user facing command implementations for the bot
 
+import asyncio
 import logging
 
 import hikari
@@ -246,7 +247,10 @@ async def ls_command(ctx: lightbulb.Context):
             settings: ls.LostSectorPostSettings = await session.get(
                 ls.LostSectorPostSettings, 0
             )
-    await ctx.respond(embed=await settings.get_announce_embed())
+    embed = await settings.get_announce_embed()
+    await ctx.respond(embed=embed)
+    # Test fix for emoji problem that only shows up in prod
+    await ctx.edit_last_response(embed=embed)
 
 
 async def command_options_updater(event: RefreshCmdListEvent):
