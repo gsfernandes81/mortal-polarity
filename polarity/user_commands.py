@@ -249,8 +249,6 @@ async def ls_command(ctx: lightbulb.Context):
             )
     embed = await settings.get_announce_embed()
     await ctx.respond(embed=embed)
-    # Test fix for emoji problem that only shows up in prod
-    await ctx.edit_last_response(embed=embed)
 
 
 async def command_options_updater(event: RefreshCmdListEvent):
