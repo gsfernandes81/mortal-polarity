@@ -301,7 +301,8 @@ async def start_signal_receiver(event: hikari.StartedEvent) -> None:
     # Start the web server for periodic signals from apscheduler
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "localhost", cfg.port)
+    # Switch to ipv4 since railway hosting does not like ipv6
+    site = web.TCPSite(runner, "127.0.0.1", cfg.port)
     await site.start()
 
 
