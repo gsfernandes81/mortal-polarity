@@ -15,18 +15,27 @@
 
 import lightbulb
 
-from . import autopost, cfg
+from . import cfg
 from .utils import _discord_alert
+from .reset_signaller import (
+    remote_daily_reset,
+    remote_weekend_reset,
+    remote_weekly_reset,
+)
 
 
 @lightbulb.command(
     name="trigger_daily_reset",
     description="Sends a daily reset signal",
     guilds=(cfg.test_env,),
+    auto_defer=True,
 )
 @lightbulb.implements(lightbulb.SlashCommand)
 async def daily_reset(ctx: lightbulb.Context) -> None:
-    ctx.bot.dispatch(autopost.DailyResetSignal(ctx.bot))
+    # Move from internal signalling to http signalling for these
+    # commands, which makes them a more reliable test
+    # ctx.bot.dispatch(autopost.DailyResetSignal(ctx.bot))
+    await remote_daily_reset()
     await ctx.respond("Daily reset signal sent")
 
 
@@ -37,7 +46,10 @@ async def daily_reset(ctx: lightbulb.Context) -> None:
 )
 @lightbulb.implements(lightbulb.SlashCommand)
 async def weekly_reset(ctx: lightbulb.Context) -> None:
-    ctx.bot.dispatch(autopost.WeeklyResetSignal(ctx.bot))
+    # Move from internal signalling to http signalling for these
+    # commands, which makes them a more reliable test
+    # ctx.bot.dispatch(autopost.WeeklyResetSignal(ctx.bot))
+    await remote_weekly_reset()
     await ctx.respond("Weekly reset signal sent")
 
 
@@ -48,7 +60,10 @@ async def weekly_reset(ctx: lightbulb.Context) -> None:
 )
 @lightbulb.implements(lightbulb.SlashCommand)
 async def weekend_reset(ctx: lightbulb.Context) -> None:
-    ctx.bot.dispatch(autopost.WeekendResetSignal(ctx.bot))
+    # Move from internal signalling to http signalling for these
+    # commands, which makes them a more reliable test
+    # ctx.bot.dispatch(autopost.WeekendResetSignal(ctx.bot))
+    await remote_weekend_reset()
     await ctx.respond("Weekend reset signal sent")
 
 
