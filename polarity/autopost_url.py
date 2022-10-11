@@ -22,6 +22,7 @@ import functools
 import logging
 from calendar import month_name as month
 from typing import Callable, List, Type
+import aiohttp
 
 import hikari
 import lightbulb
@@ -113,7 +114,13 @@ class UrlPostSettings(BasePostSettings):
                 self.url_watcher_armed = True
             check_interval = 10
             while True:
-                current_redirected_url = await follow_link_single_step(self.url)
+                try:
+                    current_redirected_url = await follow_link_single_step(self.url)
+                except aiohttp.ServerDisconnectedError:
+                    # Work around rebrandly disconnecting long running
+                    # TCP connections that aiohttp maintains for
+                    # performance reasons
+                    continue
                 if current_redirected_url != self.url_redirect_target:
                     async with session.begin():
                         session.add(self)
