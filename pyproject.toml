@@ -35,8 +35,9 @@ poetry-githooks = "^2.0.0"
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.githooks]
+# [tool.githooks]
+# NOTE: We should not need githooks any more with railway.app
 # Note: Run "poetry run githooks setup" every time you change this section
 # The without-hashes flag is necessary since private repos don't mix well
 # with pip hashes
-pre-commit = "poetry export -f requirements.txt -o requirements.txt --without-hashes && git add requirements.txt"
+# pre-commit = "poetry export -f requirements.txt -o requirements.txt --without-hashes && git add requirements.txt"
