@@ -29,7 +29,7 @@ sys.path.insert(0, dirname(dirname(dirname(abspath(__file__)))))
 print(dirname(dirname(dirname(abspath(__file__)))))
 
 from polarity import cfg
-from polarity.main import Base
+from polarity.utils import Base
 
 
 # this is the Alembic Config object, which provides

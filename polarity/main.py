@@ -22,8 +22,6 @@ from . import cfg, controller, debug_commands, user_commands, migration_commands
 from .autopost import autoposts
 from .ls import lost_sectors
 
-# Note: Alembic's env.py is set up to import Base from polarity.main
-from .utils import Base
 from .weekly_reset import weekly_reset
 from .xur import xur
 
