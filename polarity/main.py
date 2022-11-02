@@ -18,7 +18,7 @@ import lightbulb
 import uvloop
 from lightbulb.ext import tasks
 
-from . import cfg, controller, debug_commands, user_commands
+from . import cfg, controller, debug_commands, user_commands, migration_commands
 from .autopost import autoposts
 from .ls import lost_sectors
 
@@ -60,4 +60,5 @@ if __name__ == "__main__":
     tasks.load(bot)
     if cfg.test_env:
         debug_commands.register_all(bot)
+    migration_commands.register_all(bot)
     bot.run()
