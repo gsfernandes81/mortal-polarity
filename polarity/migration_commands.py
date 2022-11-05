@@ -84,15 +84,15 @@ async def migratability(ctx: lightbulb.Context) -> None:
             if h.Permissions.MANAGE_WEBHOOKS in perms:
                 no_of_channels_w_perms += 1
 
-            embed.add_field(
-                channel_type,
-                "({} Migratable + {} Not Applicable) / {} Total".format(
-                    no_of_channels_w_perms, no_of_non_guild_channels, no_of_channels
-                ),
-                inline=False,
-            )
+        embed.add_field(
+            channel_type,
+            "({} Migratable + {} Not Applicable) / {} Total".format(
+                no_of_channels_w_perms, no_of_non_guild_channels, no_of_channels
+            ),
+            inline=False,
+        )
 
-    await ctx.edit_last_response(embed=embed)
+    await ctx.edit_last_response(content="", embed=embed)
 
 
 def register_all(bot: lightbulb.BotApp) -> None:
