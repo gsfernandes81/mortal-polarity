@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "mortal-polarity"
+name = "polarity"
 version = "0.1"
 description = ""
 authors = ["GS <gsfernandes81@gmail.com>"]
 license = "GNU AGPL-3.0-or-later"
 
 [tool.poetry.dependencies]
-python = "~3.10.5"
+python = "~3.9.0"
 postgres = "*"
 psycopg2-binary = "*"
 psycopg2-pool = "*"
@@ -17,7 +17,7 @@ SQLAlchemy = "^1.4.41"
 hikari = { extras = ["speedups"], version = "==2.0.0.dev111" }
 hikari-lightbulb = "^2.2"
 uvloop = "^0.17.0"
-sector_accounting = { git = "https://github.com/gs729/sector_accounting.git", rev = "b6059f4" }
+sector_accounting = { git = "https://github.com/gs729/sector_accounting.git", rev = "cf35318" }
 requests = "^2.28.1"
 APScheduler = "^3.9.1"
 aiohttp = ">=3.8.3"
@@ -25,6 +25,8 @@ lightbulb-ext-wtf = { git = "https://github.com/tandemdude/lightbulb-ext-wtf.git
 tweepy = ">=4.12.0"
 hikari-toolbox = { git = "https://github.com/brazier-dev/hikari-toolbox.git", rev = "ac4810d" }
 setuptools = "^65.0.0"
+# Avoid yarl 1.8.1 hash failures 
+yarl = "=1.8.0"
 
 [tool.poetry.dev-dependencies]
 pyflakes = "*"
@@ -32,6 +34,9 @@ bandit = "*"
 black = "*"
 rope = "*"
 # poetry-githooks = "^2.0.0"
+
+[tool.poetry.group.dev.dependencies]
+honcho = "^1.1.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
