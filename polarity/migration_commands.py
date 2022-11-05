@@ -23,6 +23,7 @@ from . import cfg, ls, weekly_reset, xur
 from .utils import db_session
 
 
+@lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
 @lightbulb.command(
     name="migratability",
     description="Check how many bot follows can be moved to discord follows",
