@@ -27,6 +27,7 @@ hikari-toolbox = { git = "https://github.com/brazier-dev/hikari-toolbox.git", re
 setuptools = "^65.0.0"
 # Avoid yarl 1.8.1 hash failures 
 yarl = "=1.8.0"
+honcho = "^1.1.0"
 
 [tool.poetry.dev-dependencies]
 pyflakes = "*"
@@ -35,8 +36,6 @@ black = "*"
 rope = "*"
 # poetry-githooks = "^2.0.0"
 
-[tool.poetry.group.dev.dependencies]
-honcho = "^1.1.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

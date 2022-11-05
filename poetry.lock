@@ -415,7 +415,7 @@ resolved_reference = "ac4810dfe640fc5d1cb3ea3886fdae1d707d52c5"
 name = "honcho"
 version = "1.1.0"
 description = "Honcho: a Python clone of Foreman. For managing Procfile-based applications."
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -929,7 +929,7 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "1.1"
 python-versions = "~3.9.0"
-content-hash = "6537aa57559a7d99fecb568d70e14ce0ac618ab39cc08a3d7629ff642e4552db"
+content-hash = "8bdf978b4ab9f9af522a5ee2e5b98820419e789dedd06fcb0b7d13cc6b641e69"
 
 [metadata.files]
 aiodns = [

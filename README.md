@@ -10,8 +10,8 @@ Setting up the dev environment:
 Running code locally:
 
 0. `poetry shell`
-1. `honcho start release` (mainly if a db migration is needed)
-2. `honcho start clock`
+1. `honcho start -f Procfile.release` (mainly if a db migration is needed)
+2. `honcho start`
 
 Running code locally with docker:
 NOTE: Migrations not set up yet
