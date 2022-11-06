@@ -147,8 +147,8 @@ async def ls_control(ctx: lightbulb.Context):
 
 
 async def ls_announce(ctx: lightbulb.Context):
-    ctx.bot.dispatch(LostSectorSignal(ctx.bot))
     await ctx.respond("Announcing now")
+    ctx.bot.dispatch(LostSectorSignal(ctx.bot))
 
 
 class LostSectors(AutopostsBase):
