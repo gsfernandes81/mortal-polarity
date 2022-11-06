@@ -35,14 +35,9 @@ async def autoupdate_status():
         await bot.wait_for(lightbulb.events.LightbulbStartedEvent, timeout=None)
         bot.d.has_lightbulb_started = True
 
-    total_users_approx = 0
-    for guild in bot.cache.get_guilds_view():
-        if isinstance(guild, hikari.Snowflake):
-            guild = await bot.rest.fetch_guild(guild)
-        total_users_approx += guild.approximate_member_count or 0
     await bot.update_presence(
         activity=hikari.Activity(
-            name="{} users : )".format(total_users_approx),
+            name="{} servers : )".format(len(bot.cache.get_guilds_view())),
             type=hikari.ActivityType.LISTENING,
         )
     )
