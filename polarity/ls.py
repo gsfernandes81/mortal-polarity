@@ -131,6 +131,14 @@ class LostSectorSignal(BaseCustomEvent):
         self.bot.listen()(self.conditional_daily_reset_repeater)
 
 
+class LostSectorTwitterSignal(BaseCustomEvent):
+    pass
+
+
+class LostSectorDiscordSignal(BaseCustomEvent):
+    pass
+
+
 async def ls_control(ctx: lightbulb.Context):
     option = True if ctx.options.option.lower() == "enable" else False
     async with db_session() as session:
@@ -149,6 +157,16 @@ async def ls_control(ctx: lightbulb.Context):
 async def ls_announce(ctx: lightbulb.Context):
     await ctx.respond("Announcing now")
     ctx.bot.dispatch(LostSectorSignal(ctx.bot))
+
+
+async def ls_twitter_announce(ctx: lightbulb.Context):
+    await ctx.respond("Announcing to twitter now")
+    ctx.bot.dispatch(LostSectorTwitterSignal(ctx.bot))
+
+
+async def ls_discord_announce(ctx: lightbulb.Context):
+    await ctx.respond("Announcing to discord now")
+    ctx.bot.dispatch(LostSectorDiscordSignal(ctx.bot))
 
 
 class LostSectors(AutopostsBase):
@@ -173,6 +191,8 @@ class LostSectors(AutopostsBase):
         )
         self.control_cmd_group.child(self.commands())
         bot.listen(LostSectorSignal)(self.announce_to_twitter)
+        bot.listen(LostSectorTwitterSignal)(self.announce_to_twitter)
+        bot.listen(LostSectorDiscordSignal)(LostSectorAutopostChannel.announcer)
 
     def commands(self):
         return wtf.Command[
@@ -215,6 +235,22 @@ class LostSectors(AutopostsBase):
                     wtf.InheritChecks[True],
                     wtf.Implements[lightbulb.SlashSubCommand],
                     wtf.Executes[ls_announce],
+                ],
+                wtf.Command[
+                    wtf.Name["announce_twitter"],
+                    wtf.Description["Trigger a twitter announcement manually"],
+                    wtf.AutoDefer[True],
+                    wtf.InheritChecks[True],
+                    wtf.Implements[lightbulb.SlashSubCommand],
+                    wtf.Executes[ls_twitter_announce],
+                ],
+                wtf.Command[
+                    wtf.Name["announce_discord"],
+                    wtf.Description["Trigger a discord-only announcement manually"],
+                    wtf.AutoDefer[True],
+                    wtf.InheritChecks[True],
+                    wtf.Implements[lightbulb.SlashSubCommand],
+                    wtf.Executes[ls_discord_announce],
                 ],
             ],
         ]
