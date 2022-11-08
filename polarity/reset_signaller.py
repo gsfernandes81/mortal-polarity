@@ -33,6 +33,10 @@ from pytz import utc
 
 from . import cfg
 
+# Port for main.py / the "main" process to run on
+# This will be 100 less than the Port variable (see Honcho docs)
+PORT = cfg.port - 100
+
 # We use the AsyncIOScheduler since the discord client library
 # runs mostly asynchronously
 # This will be useful when this is run in a single process
@@ -51,7 +55,7 @@ async def remote_daily_reset():
     print("Sending daily reset signal")
     async with aiohttp.ClientSession() as session:
         await session.post(
-            "http://127.0.0.1:{}/daily-reset-signal".format(cfg.port), verify_ssl=False
+            "http://127.0.0.1:{}/daily-reset-signal".format(PORT), verify_ssl=False
         )
 
 
@@ -59,7 +63,7 @@ async def remote_weekly_reset():
     print("Sending daily reset signal")
     async with aiohttp.ClientSession() as session:
         await session.post(
-            "http://127.0.0.1:{}/weekly-reset-signal".format(cfg.port), verify_ssl=False
+            "http://127.0.0.1:{}/weekly-reset-signal".format(PORT), verify_ssl=False
         )
 
 
@@ -67,7 +71,7 @@ async def remote_weekend_reset():
     print("Sending weekend signal")
     async with aiohttp.ClientSession() as session:
         await session.post(
-            "http://127.0.0.1:{}/weekend-reset-signal".format(cfg.port),
+            "http://127.0.0.1:{}/weekend-reset-signal".format(PORT),
             verify_ssl=False,
         )
 
