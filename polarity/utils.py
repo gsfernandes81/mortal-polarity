@@ -70,15 +70,15 @@ async def _create_or_get(cls, id, **kwargs):
 
 
 @contextlib.contextmanager
-def operation_timer(op_name):
+def operation_timer(op_name, logger=logging.getLogger("main/" + __name__)):
     start_time = dt.datetime.now()
-    logging.info("{name} started".format(name=op_name))
+    logger.info("Announce started".format(name=op_name))
     yield
     end_time = dt.datetime.now()
     time_delta = end_time - start_time
     minutes = time_delta.seconds // 60
     seconds = time_delta.seconds % 60
-    logging.info(
+    logger.info(
         "{name} finished in {mins} minutes and {secs} seconds".format(
             name=op_name, mins=minutes, secs=seconds
         )
@@ -114,7 +114,9 @@ def day_period(today: dt.datetime = None) -> Tuple[dt.datetime, dt.datetime]:
     return today, today_end
 
 
-async def follow_link_single_step(url: str) -> str:
+async def follow_link_single_step(
+    url: str, logger=logging.getLogger("main/" + __name__)
+) -> str:
     async with aiohttp.ClientSession() as session:
         async with session.get(url, allow_redirects=False) as resp:
             try:
@@ -122,7 +124,7 @@ async def follow_link_single_step(url: str) -> str:
             except KeyError:
                 # If we can't find the location key, warn and return the
                 # provided url itself
-                logging.info(
+                logger.info(
                     "Could not find redirect for url "
                     + "{}, returning as is".format(url)
                 )
@@ -135,6 +137,7 @@ async def _send_embed(
     embed: hikari.Embed,
     channel_table,  # Must be the class of the channel, not an instance
     announce_if_guild=-1,  # Announce if channel is in this guild
+    logger=logging.getLogger("main/" + __name__),
 ) -> None:
     try:
         channel = event.bot.cache.get_guild_channel(
@@ -152,7 +155,7 @@ async def _send_embed(
                         await event.bot.rest.crosspost_message(channel, message)
 
     except (hikari.ForbiddenError, hikari.NotFoundError):
-        logging.warning(
+        logger.warning(
             "Channel {} not found or not messageable, disabling posts in {}".format(
                 channel_id, str(channel_table.__class__.__name__)
             )
@@ -172,6 +175,7 @@ async def _edit_embedded_message(
     bot: hikari.GatewayBot,
     embed: hikari.Embed,
     announce_if_guild: int = -1,
+    logger=logging.getLogger("main/" + __name__),
 ) -> None:
     try:
         msg: hikari.Message = bot.cache.get_message(
@@ -235,6 +239,7 @@ async def _discord_alert(
     bot: lightbulb.BotApp = None,
     channel: Union[None, int, hikari.TextableChannel],
     mention_mods: bool = True,
+    logger=logging.getLogger("main/" + __name__)
 ):
     # Sends an alert in the specified channels
     # logs the same alert
@@ -249,7 +254,7 @@ async def _discord_alert(
     if mention_mods:
         alert = alert + "<@&{}> ".format(cfg.admin_role)
 
-    logging.warning(alert)
+    logger.warning(alert)
 
     # If we get a single channel, turn it into a len() = 1 list
     if isinstance(channel, int):

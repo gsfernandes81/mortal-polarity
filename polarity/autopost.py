@@ -33,6 +33,8 @@ from .utils import _send_embed, db_session, operation_timer
 
 app = web.Application()
 
+logger = logging.getLogger(__name__)
+
 
 @declarative_mixin
 class BasePostSettings:
@@ -188,14 +190,12 @@ class BaseChannelRecord:
                 channel_id_list = [] if channel_id_list is None else channel_id_list
                 channel_id_list = [channel[0].id for channel in channel_id_list]
 
-            logging.info(
+            logger.info(
                 # Note, need to implement regex to specify which announcement
                 # is being carried out in these logs
-                "Announcing {} posts to {} channels".format(
-                    "base", len(channel_id_list)
-                )
+                "Announcing posts to {} channels".format(len(channel_id_list))
             )
-            with operation_timer("Base announce"):
+            with operation_timer("Announce", logger):
                 embed = await settings.get_announce_embed()
                 await asyncio.gather(
                     *[
@@ -205,6 +205,7 @@ class BaseChannelRecord:
                             embed,
                             cls,
                             announce_if_guild=cfg.kyber_discord_server_id,
+                            logger=logger,
                         )
                         for channel_id in channel_id_list
                     ],
@@ -234,13 +235,13 @@ class ResetSignal(BaseCustomEvent):
 
     async def remote_fire(self, request: web.Request) -> web.Response:
         if str(request.remote) == "127.0.0.1":
-            logging.info(
+            logger.info(
                 "{self.qualifier} reset signal received and passed on".format(self=self)
             )
             self.fire()
             return web.Response(status=200)
         else:
-            logging.warning(
+            logger.warning(
                 "{self.qualifier} reset signal received from non-local source, ignoring".format(
                     self=self
                 )

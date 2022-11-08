@@ -35,6 +35,8 @@ from .utils import (
 
 command_registry = {}
 
+logger = logging.getLogger(__name__)
+
 
 class Commands(Base):
     __tablename__ = "commands"
@@ -90,7 +92,7 @@ async def add_command(ctx: lightbulb.Context) -> None:
 
             command_registry[command.name] = db_command_to_lb_user_command(command)
             bot.command(command_registry[command.name])
-            logging.info(command.name + " command registered")
+            logger.info(command.name + " command registered")
             RefreshCmdListEvent(bot).dispatch()
 
     await ctx.respond("Command added")
@@ -261,7 +263,7 @@ async def command_options_updater(event: RefreshCmdListEvent):
 
 async def register_commands_on_startup(event: hikari.StartingEvent):
     """Register additional text commands from db."""
-    logging.info("Registering commands")
+    logger.info("Registering commands")
     async with db_session() as session:
         async with session.begin():
             command_list = (await session.execute(select(Commands))).fetchall()
@@ -270,7 +272,7 @@ async def register_commands_on_startup(event: hikari.StartingEvent):
             for command in command_list:
                 command_registry[command.name] = db_command_to_lb_user_command(command)
                 event.app.command(command_registry[command.name])
-                logging.info(command.name + " registered")
+                logger.info(command.name + " registered")
 
     # Trigger a refresh of the options in the delete command
     # Don't sync since the bot has not started yet and
@@ -281,7 +283,7 @@ async def register_commands_on_startup(event: hikari.StartingEvent):
 async def on_error(event: lightbulb.CommandErrorEvent):
     if isinstance(event.exception, lightbulb.errors.MissingRequiredRole):
         await event.context.respond("Permission denied")
-        logging.warning(
+        logger.warning(
             "Note: privlidged command access attempt by uid: {}, name: {}#{}".format(
                 event.context.user.id,
                 event.context.user.username,
@@ -320,7 +322,7 @@ async def user_command(ctx: lightbulb.Context):
     redirected_text = url_regex.sub("{}", text)
 
     for link in links:
-        redirected_links.append(await follow_link_single_step(link))
+        redirected_links.append(await follow_link_single_step(link, logger))
 
     redirected_text = redirected_text.format(*redirected_links)
 

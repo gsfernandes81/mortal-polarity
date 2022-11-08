@@ -22,6 +22,8 @@ import toolbox
 from . import cfg, ls, weekly_reset, xur
 from .utils import db_session
 
+logger = logging.getLogger(__name__)
+
 
 @lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
 @lightbulb.command(
@@ -82,7 +84,7 @@ async def migratability(ctx: lightbulb.Context) -> None:
 
             bot_member = await bot.rest.fetch_member(guild, bot_user)
             perms = toolbox.calculate_permissions(bot_member, channel)
-            logging.info(
+            logger.info(
                 "Guild/Channel : {}/{}".format(channel.get_guild().name, channel.name)
             )
 

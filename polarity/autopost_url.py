@@ -47,6 +47,9 @@ from .utils import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 @declarative_mixin
 class UrlPostSettings(BasePostSettings):
     # url: the infographic url
@@ -99,7 +102,7 @@ class UrlPostSettings(BasePostSettings):
             await self.update_url()
 
     async def update_url(self):
-        redirected_url = await follow_link_single_step(self.url)
+        redirected_url = await follow_link_single_step(self.url, logger)
         self.url_last_checked = dt.datetime.now()
         if redirected_url != self.url_redirect_target:
             self.url_redirect_target = redirected_url
@@ -115,7 +118,9 @@ class UrlPostSettings(BasePostSettings):
             check_interval = 10
             while True:
                 try:
-                    current_redirected_url = await follow_link_single_step(self.url)
+                    current_redirected_url = await follow_link_single_step(
+                        self.url, logger
+                    )
                 except aiohttp.ServerDisconnectedError:
                     # Work around rebrandly disconnecting long running
                     # TCP connections that aiohttp maintains for
@@ -449,8 +454,8 @@ class UrlAutopostsBase(AutopostsBase):
                 channel_record_list: List[BaseChannelRecord] = [
                     channel[0] for channel in channel_record_list
                 ]
-            logging.info("Correcting posts")
-            with operation_timer("Announce correction"):
+            logger.info("Correcting posts")
+            with operation_timer("Announce correction", logger):
                 await ctx.respond("Correcting posts now")
                 embed = await settings.get_announce_embed(
                     change,
@@ -470,6 +475,7 @@ class UrlAutopostsBase(AutopostsBase):
                         ctx.bot,
                         embed,
                         announce_if_guild=cfg.kyber_discord_server_id,
+                        logger=logger,
                     )
 
                     if percentage_progress < round(20 * (idx + 1) / no_of_channels) * 5:

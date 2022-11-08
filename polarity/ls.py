@@ -48,6 +48,9 @@ from .utils import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 class LostSectorPostSettings(BasePostSettings, Base):
     twitter_ls_post_string = (
         "Lost Sector Today\n\n"
@@ -279,8 +282,8 @@ class LostSectors(AutopostsBase):
                 channel_record_list: List[BaseChannelRecord] = [
                     channel[0] for channel in channel_record_list
                 ]
-            logging.info("Correcting posts")
-            with operation_timer("Announce correction"):
+            logger.info("Correcting posts")
+            with operation_timer("Announce correction", logger):
                 await ctx.respond("Correcting posts now")
                 embed = await settings.get_announce_embed()
 
@@ -300,6 +303,7 @@ class LostSectors(AutopostsBase):
                         ctx.bot,
                         embed,
                         announce_if_guild=cfg.kyber_discord_server_id,
+                        logger=logger,
                     )
 
                     if percentage_progress < round(20 * (idx + 1) / no_of_channels) * 5:
@@ -325,7 +329,9 @@ class LostSectors(AutopostsBase):
                 file_name,
             )
         except ValueError as err:
-            _discord_alert(err.args[0], channel=cfg.alerts_channel_id, bot=event.bot)
+            _discord_alert(
+                err.args[0], channel=cfg.alerts_channel_id, bot=event.bot, logger=logger
+            )
 
     def _announce_to_twitter_sync(self, tweet_string, attachment_file_name=None):
         if len(tweet_string) > 280:
