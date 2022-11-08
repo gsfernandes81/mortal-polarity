@@ -60,7 +60,7 @@ async def remote_daily_reset():
 
 
 async def remote_weekly_reset():
-    print("Sending daily reset signal")
+    print("Sending weekly reset signal")
     async with aiohttp.ClientSession() as session:
         await session.post(
             "http://127.0.0.1:{}/weekly-reset-signal".format(PORT), verify_ssl=False
