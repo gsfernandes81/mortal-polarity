@@ -24,8 +24,8 @@ from typing import List, Tuple, Union
 
 import aiofiles
 import aiohttp
-import hikari
-import lightbulb
+import hikari as h
+import lightbulb as lb
 import yarl
 from pytz import utc
 from sqlalchemy import update
@@ -44,8 +44,8 @@ db_engine = create_async_engine(cfg.db_url_async, connect_args={"timeout": 120})
 db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
 
 
-class RefreshCmdListEvent(hikari.Event):
-    def __init__(self, bot: hikari.GatewayBot, sync: bool = True):
+class RefreshCmdListEvent(h.Event):
+    def __init__(self, bot: h.GatewayBot, sync: bool = True):
         super().__init__()
         # Whether to run the sync_application_commands method of the app
         self.bot = bot
@@ -133,8 +133,8 @@ async def follow_link_single_step(
 
 async def _send_embed(
     channel_id: int,
-    event: hikari.Event,
-    embed: hikari.Embed,
+    event: h.Event,
+    embed: h.Embed,
     channel_table,  # Must be the class of the channel, not an instance
     announce_if_guild=-1,  # Announce if channel is in this guild
     logger=logging.getLogger("main/" + __name__),
@@ -143,9 +143,9 @@ async def _send_embed(
         channel = event.bot.cache.get_guild_channel(
             channel_id
         ) or await event.bot.rest.fetch_channel(channel_id)
-        # Can add hikari.GuildNewsChannel for announcement channel support
+        # Can add h.GuildNewsChannel for announcement channel support
         # could be useful if we automate more stuff for Kyber
-        if isinstance(channel, hikari.TextableChannel):
+        if isinstance(channel, h.TextableChannel):
             async with db_session() as session:
                 async with session.begin():
                     channel_record = await session.get(channel_table, channel_id)
@@ -154,7 +154,7 @@ async def _send_embed(
                     if channel_record.server_id == announce_if_guild:
                         await event.bot.rest.crosspost_message(channel, message)
 
-    except (hikari.ForbiddenError, hikari.NotFoundError):
+    except (h.ForbiddenError, h.NotFoundError):
         logger.warning(
             "Channel {} not found or not messageable, disabling posts in {}".format(
                 channel_id, str(channel_table.__class__.__name__)
@@ -172,26 +172,26 @@ async def _send_embed(
 async def _edit_embedded_message(
     message_id: int,
     channel_id: int,
-    bot: hikari.GatewayBot,
-    embed: hikari.Embed,
+    bot: h.GatewayBot,
+    embed: h.Embed,
     announce_if_guild: int = -1,
     logger=logging.getLogger("main/" + __name__),
 ) -> None:
     try:
-        msg: hikari.Message = bot.cache.get_message(
+        msg: h.Message = bot.cache.get_message(
             message_id
         ) or await bot.rest.fetch_message(channel_id, message_id)
-        if isinstance(msg, hikari.Message):
+        if isinstance(msg, h.Message):
             await msg.edit(content="", embed=embed)
             try:
                 if msg.guild_id == announce_if_guild:
                     await bot.rest.crosspost_message(channel_id, msg)
             except AttributeError:
                 pass
-            except hikari.BadRequestError as err:
+            except h.BadRequestError as err:
                 if not ("This message has already been crossposted" in str(err)):
                     raise err
-    except (hikari.ForbiddenError, hikari.NotFoundError):
+    except (h.ForbiddenError, h.NotFoundError):
         logging.warning("Message {} not found or not editable".format(message_id))
 
 
@@ -236,8 +236,8 @@ async def _run_in_thread_pool(func, *args, **kwargs):
 
 async def _discord_alert(
     *args: str,
-    bot: lightbulb.BotApp = None,
-    channel: Union[None, int, hikari.TextableChannel],
+    bot: lb.BotApp = None,
+    channel: Union[None, int, h.TextableChannel],
     mention_mods: bool = True,
     logger=logging.getLogger("main/" + __name__)
 ):
