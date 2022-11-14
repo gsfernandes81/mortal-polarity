@@ -85,9 +85,6 @@ async def migratability(ctx: lightbulb.Context) -> None:
 
             bot_member = await bot.rest.fetch_member(guild, bot_user)
             perms = toolbox.calculate_permissions(bot_member, channel)
-            logger.info(
-                "Guild/Channel : {}/{}".format(channel.get_guild().name, channel.name)
-            )
 
             if h.Permissions.MANAGE_WEBHOOKS in perms:
                 no_of_channels_w_perms += 1
