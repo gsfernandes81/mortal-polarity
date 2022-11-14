@@ -329,7 +329,7 @@ class LostSectors(AutopostsBase):
                 file_name,
             )
         except ValueError as err:
-            _discord_alert(
+            await _discord_alert(
                 err.args[0], channel=cfg.alerts_channel_id, bot=event.bot, logger=logger
             )
 
