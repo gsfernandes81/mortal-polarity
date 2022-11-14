@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 @lightbulb.command(
     name="trigger_daily_reset",
     description="Sends a daily reset signal",
-    guilds=(cfg.test_env,),
+    guilds=cfg.test_env,
     auto_defer=True,
 )
 @lightbulb.implements(lightbulb.SlashCommand)
@@ -46,7 +46,7 @@ async def daily_reset(ctx: lightbulb.Context) -> None:
 @lightbulb.command(
     name="trigger_weekly_reset",
     description="Sends a weekly reset signal",
-    guilds=(cfg.test_env,),
+    guilds=cfg.test_env,
 )
 @lightbulb.implements(lightbulb.SlashCommand)
 async def weekly_reset(ctx: lightbulb.Context) -> None:
@@ -60,7 +60,7 @@ async def weekly_reset(ctx: lightbulb.Context) -> None:
 @lightbulb.command(
     name="trigger_weekend_reset",
     description="Sends a weekend reset signal",
-    guilds=(cfg.test_env,),
+    guilds=cfg.test_env,
 )
 @lightbulb.implements(lightbulb.SlashCommand)
 async def weekend_reset(ctx: lightbulb.Context) -> None:
@@ -80,7 +80,7 @@ async def weekend_reset(ctx: lightbulb.Context) -> None:
 @lightbulb.command(
     name="test_alert",
     description="Sends a test alert",
-    guilds=(cfg.test_env,),
+    guilds=cfg.test_env,
 )
 @lightbulb.implements(lightbulb.SlashCommand)
 async def test_alert(ctx: lightbulb.Context) -> None:
