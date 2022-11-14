@@ -70,8 +70,9 @@ async def migratability(ctx: lightbulb.Context) -> None:
                 channel = bot.cache.get_guild_channel(
                     channel_id
                 ) or await bot.rest.fetch_channel(channel_id)
-            except h.errors.NotFoundError:
+            except (h.errors.NotFoundError, h.errors.ForbiddenError):
                 no_not_found += 1
+                continue
 
             if not isinstance(channel, h.TextableGuildChannel):
                 no_of_non_guild_channels += 1
