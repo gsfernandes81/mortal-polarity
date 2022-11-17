@@ -40,7 +40,9 @@ url_regex = re.compile(
 
 
 Base = declarative_base()
-db_engine = create_async_engine(cfg.db_url_async, connect_args={"timeout": 120})
+db_engine = create_async_engine(
+    cfg.db_url_async, connect_args={"timeout": 120}, pool_pre_ping=True
+)
 db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
 
 
