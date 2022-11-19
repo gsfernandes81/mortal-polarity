@@ -39,6 +39,7 @@ class XurPostSettings(UrlPostSettings, Base):
 
 class XurAutopostChannel(UrlAutopostChannel, Base):
     settings_records = XurPostSettings
+    follow_channel = cfg.xur_follow_channel_id
 
 
 class XurSignal(BaseUrlSignal):

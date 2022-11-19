@@ -61,6 +61,10 @@ migration_deadline = str(_getenv("MIGRATION_DEADLINE"))
 migration_help = str(_getenv("MIGRATION_HELP"))
 migration_invite = str(_getenv("MIGRATION_INVITE"))
 
+ls_follow_channel_id = int(_getenv("LS_FOLLOW_CHANNEL"))
+xur_follow_channel_id = int(_getenv("XUR_FOLLOW_CHANNEL_ID"))
+reset_follow_channel_id = int(_getenv("RESET_FOLLOW_CHANNEL_ID"))
+
 tw_cons_key = str(_getenv("TWITTER_CONSUMER_KEY"))
 tw_cons_secret = str(_getenv("TWITTER_CONSUMER_SECRET"))
 tw_access_tok = str(_getenv("TWITTER_ACCESS_TOKEN"))

@@ -177,32 +177,38 @@ async def _send_embed(
     event: h.Event,
     embed: h.Embed,
     channel_table,  # Must be the class of the channel, not an instance
-    announce_if_guild=-1,  # Announce if channel is in this guild
     logger=logging.getLogger("main/" + __name__),
 ) -> None:
+    bot: lb.BotApp = event.bot
+    follow_channel: h.SnowflakeishOr[h.GuildChannel] = channel_table.follow_channel
     try:
-        channel = event.bot.cache.get_guild_channel(
+        channel = bot.cache.get_guild_channel(
             channel_id
-        ) or await event.bot.rest.fetch_channel(channel_id)
-        # Can add h.GuildNewsChannel for announcement channel support
-        # could be useful if we automate more stuff for Kyber
-        if isinstance(channel, h.TextableChannel):
-            async with db_session() as session:
-                async with session.begin():
-                    channel_record = await session.get(channel_table, channel_id)
-                    if (
-                        channel_record.server_id != cfg.kyber_discord_server_id
-                        and not await _bot_has_webhook_perms(event.bot, channel, True)
-                    ):
-                        message = await channel.send(
-                            embed=_embed_for_migration(embed),
-                            components=_component_for_migration(event.bot),
-                        )
-                    else:
+        ) or await bot.rest.fetch_channel(channel_id)
+        async with db_session() as session:
+            async with session.begin():
+                channel_record = await session.get(channel_table, channel_id)
+                if (
+                    channel_record.server_id != cfg.kyber_discord_server_id
+                    and not await _bot_has_webhook_perms(bot, channel, True)
+                ):
+                    message = await channel.send(
+                        embed=_embed_for_migration(embed),
+                        components=_component_for_migration(bot),
+                    )
+                else:
+                    try:
+                        await bot.rest.follow_channel(follow_channel, channel)
+                    except (
+                        h.BadRequestError,
+                        h.ForbiddenError,
+                        h.NotFoundError,
+                    ) as e:
+                        logging.error(e)
                         message = await channel.send(embed=embed)
-                    channel_record.last_msg_id = message.id
-                    if channel_record.server_id == announce_if_guild:
-                        await event.bot.rest.crosspost_message(channel, message)
+                channel_record.last_msg_id = message.id
+                if channel_record.server_id == cfg.kyber_discord_server_id:
+                    await bot.rest.crosspost_message(channel, message)
 
     except (h.ForbiddenError, h.NotFoundError):
         logger.warning(

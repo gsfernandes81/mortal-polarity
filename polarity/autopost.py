@@ -66,7 +66,6 @@ class BaseChannelRecord:
     __mapper_args__ = {"eager_defaults": True}
 
     id = Column("id", BigInteger, primary_key=True)
-    # Note: if server_id is -1 then this is a dm channel
     server_id = Column("server_id", BigInteger)
     last_msg_id = Column("last_msg_id", BigInteger)
     enabled = Column("enabled", Boolean)
@@ -74,6 +73,8 @@ class BaseChannelRecord:
     # Settings object for this channel type
     settings_records: Type[BasePostSettings]
     control_command_name: str = None
+    # Follow channel for this announcement type
+    follow_channel: int = None
 
     def __init__(self, id: int, server_id: int, enabled: bool):
         self.id = id
@@ -197,20 +198,15 @@ class BaseChannelRecord:
             )
             with operation_timer("Announce", logger):
                 embed = await settings.get_announce_embed()
-                await asyncio.gather(
-                    *[
-                        _send_embed(
-                            channel_id,
-                            event,
-                            embed,
-                            cls,
-                            announce_if_guild=cfg.kyber_discord_server_id,
-                            logger=logger,
-                        )
-                        for channel_id in channel_id_list
-                    ],
-                    return_exceptions=True
-                )
+                try:
+                    channel_id_list.remove(cls.follow_channel)
+                except ValueError:
+                    pass
+                else:
+                    channel_id_list.append(cls.follow_channel)
+                finally:
+                    for channel_id in channel_id_list:
+                        await _send_embed(channel_id, event, embed, cls, logger=logger)
 
 
 class BaseCustomEvent(hikari.Event):
