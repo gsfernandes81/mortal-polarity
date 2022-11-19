@@ -15,7 +15,7 @@
 
 import logging
 import hikari as h
-import lightbulb
+import lightbulb as lb
 from sqlalchemy import select
 import toolbox
 
@@ -25,15 +25,15 @@ from .utils import db_session
 logger = logging.getLogger(__name__)
 
 
-@lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
-@lightbulb.command(
+@lb.add_checks(lb.checks.has_roles(cfg.admin_role))
+@lb.command(
     name="migratability",
     description="Check how many bot follows can be moved to discord follows",
     guilds=(cfg.control_discord_server_id,),
     auto_defer=True,
 )
-@lightbulb.implements(lightbulb.SlashCommand)
-async def migratability(ctx: lightbulb.Context) -> None:
+@lb.implements(lb.SlashCommand)
+async def migratability(ctx: lb.Context) -> None:
     bot = ctx.bot
 
     await ctx.respond(content="Working...")
@@ -103,7 +103,7 @@ async def migratability(ctx: lightbulb.Context) -> None:
     await ctx.edit_last_response(content="", embed=embed)
 
 
-def register_all(bot: lightbulb.BotApp) -> None:
+def register_all(bot: lb.BotApp) -> None:
     for command in [
         migratability,
     ]:
