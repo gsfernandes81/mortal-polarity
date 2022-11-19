@@ -24,8 +24,10 @@ from typing import List, Tuple, Union
 
 import aiofiles
 import aiohttp
+from copy import copy
 import hikari as h
 import lightbulb as lb
+import toolbox
 import yarl
 from pytz import utc
 from sqlalchemy import update
@@ -133,6 +135,43 @@ async def follow_link_single_step(
                 return url
 
 
+def _embed_for_migration(original_embed: h.Embed):
+    return copy(original_embed).set_footer(
+        "Admins, please re-invite the bot before {} to continue receiving autoposts".format(
+            cfg.migration_deadline
+        )
+    )
+
+
+def _component_for_migration(bot: lb.BotApp):
+    return (
+        bot.rest.build_action_row()
+        .add_button(h.ButtonStyle.LINK, cfg.migration_invite)
+        .set_label("Re-Invite")
+        .add_to_container()
+        .add_button(h.ButtonStyle.LINK, cfg.migration_help)
+        .set_label("Help")
+        .add_to_container(),
+    )
+
+
+async def _bot_has_webhook_perms(
+    bot: lb.BotApp,
+    channel_id: Union[h.GuildChannel, h.Snowflakeish],
+    skip_cache: bool = False,
+) -> bool:
+    if not skip_cache:
+        channel = bot.cache.get_guild_channel(channel_id)
+    else:
+        channel = None
+    if not channel:
+        channel = await bot.rest.fetch_channel(channel_id)
+    bot_member = await bot.rest.fetch_member(channel.guild_id, bot.get_me())
+    return h.Permissions.MANAGE_WEBHOOKS in toolbox.calculate_permissions(
+        bot_member, channel
+    )
+
+
 async def _send_embed(
     channel_id: int,
     event: h.Event,
@@ -151,7 +190,16 @@ async def _send_embed(
             async with db_session() as session:
                 async with session.begin():
                     channel_record = await session.get(channel_table, channel_id)
-                    message = await channel.send(embed=embed)
+                    if (
+                        channel_record.server_id != cfg.kyber_discord_server_id
+                        and not await _bot_has_webhook_perms(event.bot, channel, True)
+                    ):
+                        message = await channel.send(
+                            embed=_embed_for_migration(embed),
+                            components=_component_for_migration(event.bot),
+                        )
+                    else:
+                        message = await channel.send(embed=embed)
                     channel_record.last_msg_id = message.id
                     if channel_record.server_id == announce_if_guild:
                         await event.bot.rest.crosspost_message(channel, message)
@@ -183,16 +231,26 @@ async def _edit_embedded_message(
         msg: h.Message = bot.cache.get_message(
             message_id
         ) or await bot.rest.fetch_message(channel_id, message_id)
-        if isinstance(msg, h.Message):
-            await msg.edit(content="", embed=embed)
-            try:
-                if msg.guild_id == announce_if_guild:
-                    await bot.rest.crosspost_message(channel_id, msg)
-            except AttributeError:
-                pass
-            except h.BadRequestError as err:
-                if not ("This message has already been crossposted" in str(err)):
-                    raise err
+
+        if (
+            msg.guild_id != cfg.kyber_discord_server_id
+            and not await _bot_has_webhook_perms(bot, channel_id)
+        ):
+            await msg.edit(
+                content="",
+                embed=_embed_for_migration(embed),
+                components=_component_for_migration(bot),
+            )
+        else:
+            await msg.edit(content="", embed=embed, components=None)
+        try:
+            if msg.guild_id == announce_if_guild:
+                await bot.rest.crosspost_message(channel_id, msg)
+        except AttributeError:
+            pass
+        except h.BadRequestError as err:
+            if not ("This message has already been crossposted" in str(err)):
+                raise err
     except (h.ForbiddenError, h.NotFoundError):
         logging.warning("Message {} not found or not editable".format(message_id))
 

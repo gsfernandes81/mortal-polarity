@@ -57,6 +57,10 @@ control_discord_server_id = (
     else kyber_discord_server_id
 )
 
+migration_deadline = str(_getenv("MIGRATION_DEADLINE"))
+migration_help = str(_getenv("MIGRATION_HELP"))
+migration_invite = str(_getenv("MIGRATION_INVITE"))
+
 tw_cons_key = str(_getenv("TWITTER_CONSUMER_KEY"))
 tw_cons_secret = str(_getenv("TWITTER_CONSUMER_SECRET"))
 tw_access_tok = str(_getenv("TWITTER_ACCESS_TOKEN"))
