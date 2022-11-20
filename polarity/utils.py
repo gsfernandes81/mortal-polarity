@@ -198,6 +198,7 @@ async def _send_embed(
                     )
                 else:
                     try:
+                        assert follow_channel >= 0
                         await bot.rest.follow_channel(follow_channel, channel)
                     except (
                         h.BadRequestError,
@@ -207,6 +208,11 @@ async def _send_embed(
                         logging.error(e)
                         message = await channel.send(embed=embed)
                         channel_record.last_msg_id = message.id
+                    except AssertionError:
+                        # Use follow_channel = -1 as a way to turn off auto follows
+                        message = await channel.send(embed=embed)
+                        channel_record.last_msg_id = message.id
+
                 if channel_record.server_id == cfg.kyber_discord_server_id:
                     await bot.rest.crosspost_message(channel, message)
 
