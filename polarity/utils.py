@@ -206,7 +206,7 @@ async def _send_embed(
                     ) as e:
                         logging.error(e)
                         message = await channel.send(embed=embed)
-                channel_record.last_msg_id = message.id
+                        channel_record.last_msg_id = message.id
                 if channel_record.server_id == cfg.kyber_discord_server_id:
                     await bot.rest.crosspost_message(channel, message)
 
