@@ -205,8 +205,28 @@ class BaseChannelRecord:
                 else:
                     channel_id_list.append(cls.follow_channel)
                 finally:
-                    for channel_id in channel_id_list:
-                        await _send_embed(channel_id, event, embed, cls, logger=logger)
+                    exceptions = await asyncio.gather(
+                        *[
+                            _send_embed(channel_id, event, embed, cls, logger=logger)
+                            for channel_id in channel_id_list[:-1]
+                        ],
+                        return_exceptions=True
+                    )
+                    # Run the last channel in list (Kyber's announce channel)
+                    exceptions.extend(
+                        await asyncio.gather(
+                            *[
+                                _send_embed(
+                                    channel_id, event, embed, cls, logger=logger
+                                )
+                                for channel_id in channel_id_list[-1:]
+                            ],
+                            return_exceptions=True
+                        )
+                    )
+                    for e in exceptions:
+                        if e is not None:
+                            logger.exception(e)
 
 
 class BaseCustomEvent(hikari.Event):
