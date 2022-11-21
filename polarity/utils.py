@@ -185,6 +185,11 @@ async def _send_embed(
         channel = bot.cache.get_guild_channel(
             channel_id
         ) or await bot.rest.fetch_channel(channel_id)
+        try:
+            channel.guild_id
+        except AttributeError:
+            # Ignore channels not in a guild
+            return
         async with db_session() as session:
             async with session.begin():
                 channel_record = await session.get(channel_table, channel_id)
