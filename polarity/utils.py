@@ -48,6 +48,10 @@ db_engine = create_async_engine(
 db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
 
 
+class FeatureDisabledError(Exception):
+    pass
+
+
 class RefreshCmdListEvent(h.Event):
     def __init__(self, bot: h.GatewayBot, sync: bool = True):
         super().__init__()
@@ -203,7 +207,8 @@ async def _send_embed(
                     )
                 else:
                     try:
-                        assert follow_channel >= 0
+                        if follow_channel < 0:
+                            raise FeatureDisabledError
                         await bot.rest.follow_channel(follow_channel, channel)
                     except (
                         h.BadRequestError,
@@ -213,7 +218,7 @@ async def _send_embed(
                         logging.error(e)
                         message = await channel.send(embed=embed)
                         channel_record.last_msg_id = message.id
-                    except AssertionError:
+                    except FeatureDisabledError:
                         # Use follow_channel = -1 as a way to turn off auto follows
                         message = await channel.send(embed=embed)
                         channel_record.last_msg_id = message.id
