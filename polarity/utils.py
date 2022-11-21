@@ -215,7 +215,7 @@ async def _send_embed(
                         h.ForbiddenError,
                         h.NotFoundError,
                     ) as e:
-                        logging.error(e)
+                        logger.exception(e)
                         message = await channel.send(embed=embed)
                         channel_record.last_msg_id = message.id
                     except FeatureDisabledError:
