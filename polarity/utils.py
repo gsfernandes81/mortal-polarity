@@ -177,7 +177,7 @@ async def _bot_has_webhook_perms(
 
 
 async def _send_embed(
-    channel_id: int,
+    channel_record,
     event: h.Event,
     embed: h.Embed,
     channel_table,  # Must be the class of the channel, not an instance
@@ -187,56 +187,54 @@ async def _send_embed(
     follow_channel: h.SnowflakeishOr[h.GuildChannel] = channel_table.follow_channel
     try:
         channel = bot.cache.get_guild_channel(
-            channel_id
-        ) or await bot.rest.fetch_channel(channel_id)
+            channel_record.id
+        ) or await bot.rest.fetch_channel(channel_record.id)
         try:
             channel.guild_id
         except AttributeError:
             # Ignore channels not in a guild
             return
-        async with db_session() as session:
-            async with session.begin():
-                channel_record = await session.get(channel_table, channel_id)
-                if (
-                    channel_record.server_id != cfg.kyber_discord_server_id
-                    and not await _bot_has_webhook_perms(bot, channel, True)
-                ):
-                    message = await channel.send(
-                        embed=_embed_for_migration(embed),
-                        components=_component_for_migration(bot),
-                    )
-                else:
-                    try:
-                        if follow_channel < 0:
-                            raise FeatureDisabledError
-                        await bot.rest.follow_channel(follow_channel, channel)
-                    except (
-                        h.BadRequestError,
-                        h.ForbiddenError,
-                        h.NotFoundError,
-                    ) as e:
-                        logger.exception(e)
-                        message = await channel.send(embed=embed)
-                        channel_record.last_msg_id = message.id
-                    except FeatureDisabledError:
-                        # Use follow_channel = -1 as a way to turn off auto follows
-                        message = await channel.send(embed=embed)
-                        channel_record.last_msg_id = message.id
 
-                if channel_record.server_id == cfg.kyber_discord_server_id:
-                    await bot.rest.crosspost_message(channel, message)
+        if (
+            channel_record.server_id != cfg.kyber_discord_server_id
+            and not await _bot_has_webhook_perms(bot, channel, True)
+        ):
+            message = await channel.send(
+                embed=_embed_for_migration(embed),
+                components=_component_for_migration(bot),
+            )
+        else:
+            try:
+                if follow_channel < 0:
+                    raise FeatureDisabledError
+                await bot.rest.follow_channel(follow_channel, channel)
+            except (
+                h.BadRequestError,
+                h.ForbiddenError,
+                h.NotFoundError,
+            ) as e:
+                logger.exception(e)
+                message = await channel.send(embed=embed)
+                channel_record.last_msg_id = message.id
+            except FeatureDisabledError:
+                # Use follow_channel = -1 as a way to turn off auto follows
+                message = await channel.send(embed=embed)
+                channel_record.last_msg_id = message.id
+
+        if channel_record.server_id == cfg.kyber_discord_server_id:
+            await bot.rest.crosspost_message(channel, message)
 
     except (h.ForbiddenError, h.NotFoundError):
         logger.warning(
             "Channel {} not found or not messageable, disabling posts in {}".format(
-                channel_id, str(channel_table.__class__.__name__)
+                channel_record.id, str(channel_table.__class__.__name__)
             )
         )
         async with db_session() as session:
             async with session.begin():
                 await session.execute(
                     update(channel_table)
-                    .where(channel_table.id == channel_id)
+                    .where(channel_table.id == channel_record.id)
                     .values(enabled=False)
                 )
 

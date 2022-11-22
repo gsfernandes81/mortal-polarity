@@ -189,26 +189,35 @@ class BaseChannelRecord:
                     await session.execute(select(cls).where(cls.enabled == True))
                 ).fetchall()
                 channel_id_list = [] if channel_id_list is None else channel_id_list
+                channel_record_list = [channel[0] for channel in channel_id_list]
                 channel_id_list = [channel[0].id for channel in channel_id_list]
 
             logger.info(
                 # Note, need to implement regex to specify which announcement
                 # is being carried out in these logs
-                "Announcing posts to {} channels".format(len(channel_id_list))
+                "Announcing posts to {} channels".format(len(channel_record_list))
             )
             with operation_timer("Announce", logger):
                 embed = await settings.get_announce_embed()
                 try:
-                    channel_id_list.remove(cls.follow_channel)
+                    for channel in channel_record_list:
+                        if channel.id == cls.follow_channel:
+                            follow_channel_record = channel
+                            channel_record_list.remove(channel)
+                        else:
+                            follow_channel_record = None
                 except ValueError:
                     pass
                 else:
-                    channel_id_list.append(cls.follow_channel)
+                    if follow_channel_record is not None:
+                        channel_record_list.append(follow_channel_record)
                 finally:
                     exceptions = await asyncio.gather(
                         *[
-                            _send_embed(channel_id, event, embed, cls, logger=logger)
-                            for channel_id in channel_id_list[:-1]
+                            _send_embed(
+                                channel_record, event, embed, cls, logger=logger
+                            )
+                            for channel_record in channel_record_list[:-1]
                         ],
                         return_exceptions=True
                     )
@@ -217,9 +226,9 @@ class BaseChannelRecord:
                         await asyncio.gather(
                             *[
                                 _send_embed(
-                                    channel_id, event, embed, cls, logger=logger
+                                    channel_record, event, embed, cls, logger=logger
                                 )
-                                for channel_id in channel_id_list[-1:]
+                                for channel_record in channel_record_list[-1:]
                             ],
                             return_exceptions=True
                         )
