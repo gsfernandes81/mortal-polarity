@@ -20,8 +20,8 @@ import re
 from abc import ABC, abstractmethod
 from typing import Type, Union
 
-import hikari
-import lightbulb
+import hikari as h
+import lightbulb as lb
 from aiohttp import web
 from sqlalchemy import BigInteger, Boolean, Integer, select
 from sqlalchemy.orm import declarative_mixin, declared_attr
@@ -53,7 +53,7 @@ class BasePostSettings:
         self.id = id
         self.autoannounce_enabled = autoannounce_enabled
 
-    async def get_announce_embed(self) -> hikari.Embed:
+    async def get_announce_embed(self) -> h.Embed:
         pass
 
 
@@ -84,9 +84,9 @@ class BaseChannelRecord:
     @classmethod
     def register(
         cls,
-        bot: lightbulb.BotApp,
-        cmd_group: lightbulb.SlashCommandGroup,
-        announce_event: Type[hikari.Event],
+        bot: lb.BotApp,
+        cmd_group: lb.SlashCommandGroup,
+        announce_event: Type[h.Event],
     ):
         cls.control_command_name = (
             " ".join(re.findall("[A-Z][^A-Z]*", cls.__name__)[:-2])
@@ -94,21 +94,21 @@ class BaseChannelRecord:
             else cls.control_command_name
         )
         cmd_group.child(
-            lightbulb.option(
+            lb.option(
                 "option",
                 "Enabled or disabled",
                 type=str,
                 choices=["Enable", "Disable"],
                 required=True,
             )(
-                lightbulb.command(
+                lb.command(
                     cls.control_command_name.lower().replace(" ", "_"),
                     "{} auto posts".format(cls.control_command_name.capitalize()),
                     auto_defer=True,
                     guilds=cfg.control_discord_server_id,
                     inherit_checks=True,
                 )(
-                    lightbulb.implements(lightbulb.SlashSubCommand)(
+                    lb.implements(lb.SlashSubCommand)(
                         functools.partial(cls.autopost_ctrl_usr_cmd, cls)
                     )
                 )
@@ -120,7 +120,7 @@ class BaseChannelRecord:
     async def autopost_ctrl_usr_cmd(
         # Command for the user to be able to control autoposts in their server
         cls,
-        ctx: lightbulb.Context,
+        ctx: lb.Context,
     ) -> None:
         channel_id: int = ctx.channel_id
         server_id: int = ctx.guild_id if ctx.guild_id is not None else -1
@@ -147,35 +147,35 @@ class BaseChannelRecord:
 
     @staticmethod
     async def _check_bot_has_message_perms(
-        bot: lightbulb.BotApp, channel: Union[hikari.TextableChannel, int]
+        bot: lb.BotApp, channel: Union[h.TextableChannel, int]
     ) -> bool:
-        if not isinstance(channel, hikari.TextableChannel):
+        if not isinstance(channel, h.TextableChannel):
             # Get channel from cache if possible
             channel = bot.cache.get_guild_channel(
                 channel
             ) or await bot.rest.fetch_channel(channel)
 
-        if isinstance(channel, hikari.TextableChannel):
-            if isinstance(channel, hikari.TextableGuildChannel):
+        if isinstance(channel, h.TextableChannel):
+            if isinstance(channel, h.TextableGuildChannel):
                 guild = channel.get_guild() or await channel.fetch_guild()
                 self_member = bot.cache.get_member(
                     guild, bot.get_me()
                 ) or await bot.rest.fetch_member(guild, bot.get_me())
-                perms = lightbulb.utils.permissions_in(channel, self_member)
+                perms = lb.utils.permissions_in(channel, self_member)
                 # Check if we have the send messages permission in the channel
-                # Refer to hikari.Permissions to see how / why this works
-                # Note: Hikari doesn't recognize threads
+                # Refer to h.Permissions to see how / why this works
+                # Note: hikari doesn't recognize threads
                 # Channel types 10, 11, 12 and 15 are thread types as specified in:
                 # https://discord.com/developers/docs/resources/channel#channel-object-channel-types
                 # If the channel is a thread, we need to check for the SEND_MESSAGES_IN_THREADS perm
                 if channel.type in [10, 11, 12, 15]:
                     return (
-                        hikari.Permissions.SEND_MESSAGES_IN_THREADS & perms
-                    ) == hikari.Permissions.SEND_MESSAGES_IN_THREADS
+                        h.Permissions.SEND_MESSAGES_IN_THREADS & perms
+                    ) == h.Permissions.SEND_MESSAGES_IN_THREADS
                 else:
                     return (
-                        hikari.Permissions.SEND_MESSAGES & perms
-                    ) == hikari.Permissions.SEND_MESSAGES
+                        h.Permissions.SEND_MESSAGES & perms
+                    ) == h.Permissions.SEND_MESSAGES
             else:
                 return True
 
@@ -238,20 +238,20 @@ class BaseChannelRecord:
                             logger.exception(e)
 
 
-class BaseCustomEvent(hikari.Event):
+class BaseCustomEvent(h.Event):
     def __init__(self, bot) -> None:
         super().__init__()
-        self.bot: lightbulb.BotApp = bot
+        self.bot: lb.BotApp = bot
 
     @property
-    def app(self) -> lightbulb.BotApp:
+    def app(self) -> lb.BotApp:
         return self.bot
 
 
 # Event that dispatches itself when a destiny 2 daily reset occurs.
 # When a destiny 2 reset occurs, the reset_signaller.py process
 # will send a signal to this process, which will be passed on
-# as a hikari.Event that is dispatched bot-wide
+# as a h.Event that is dispatched bot-wide
 class ResetSignal(BaseCustomEvent):
     qualifier: str
 
@@ -298,15 +298,14 @@ class WeekendResetSignal(ResetSignal):
     qualifier = "weekend"
 
 
-@lightbulb.add_checks(
-    lightbulb.checks.dm_only
-    | custom_checks.has_guild_permissions(hikari.Permissions.ADMINISTRATOR)
+@lb.add_checks(
+    lb.checks.dm_only | custom_checks.has_guild_permissions(h.Permissions.ADMINISTRATOR)
 )
-@lightbulb.command(
+@lb.command(
     "autopost", "Server autopost management, can be used by server administrators only"
 )
-@lightbulb.implements(lightbulb.SlashCommandGroup)
-async def autopost_cmd_group(ctx: lightbulb.Context) -> None:
+@lb.implements(lb.SlashCommandGroup)
+async def autopost_cmd_group(ctx: lb.Context) -> None:
     await ctx.respond(
         "Server autopost management commands, please use the subcommands here to manage autoposts"
     )
@@ -314,7 +313,7 @@ async def autopost_cmd_group(ctx: lightbulb.Context) -> None:
 
 @autopost_cmd_group.set_error_handler
 async def announcements_error_handler(
-    event: lightbulb.MissingRequiredPermission,
+    event: lb.MissingRequiredPermission,
 ) -> None:
     ctx = event.context
     await ctx.respond(
@@ -323,7 +322,7 @@ async def announcements_error_handler(
     )
 
 
-async def start_signal_receiver(event: hikari.StartedEvent) -> None:
+async def start_signal_receiver(event: h.StartedEvent) -> None:
     # Start the web server for periodic signals from apscheduler
     runner = web.AppRunner(app)
     await runner.setup()
@@ -338,16 +337,16 @@ class AutopostsBase(ABC):
         self.control_cmd_group = control_cmd_group
 
     @abstractmethod
-    def register(self, bot: lightbulb.BotApp) -> None:
+    def register(self, bot: lb.BotApp) -> None:
         pass
 
 
 class Autoposts(AutopostsBase):
-    def register(self, bot: lightbulb.BotApp) -> None:
+    def register(self, bot: lb.BotApp) -> None:
         DailyResetSignal(bot).arm()
         WeeklyResetSignal(bot).arm()
         WeekendResetSignal(bot).arm()
-        bot.listen(hikari.StartedEvent)(start_signal_receiver)
+        bot.listen(h.StartedEvent)(start_signal_receiver)
 
         # Connect commands
         bot.command(self.autopost_cmd_group)

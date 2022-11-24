@@ -18,8 +18,8 @@
 import asyncio
 import logging
 
-import hikari
-import lightbulb
+import hikari as h
+import lightbulb as lb
 from sqlalchemy import String
 from sqlalchemy.sql.expression import delete, select
 from sqlalchemy.sql.schema import Column
@@ -52,20 +52,18 @@ class Commands(Base):
         self.response = response
 
 
-@lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
-@lightbulb.option("response", "Response to post when this command is used", type=str)
-@lightbulb.option(
-    "description", "Description of what the command posts or does", type=str
-)
-@lightbulb.option("name", "Name of the command to add", type=str)
-@lightbulb.command(
+@lb.add_checks(lb.checks.has_roles(cfg.admin_role))
+@lb.option("response", "Response to post when this command is used", type=str)
+@lb.option("description", "Description of what the command posts or does", type=str)
+@lb.option("name", "Name of the command to add", type=str)
+@lb.command(
     "add",
     "Add a command to the bot",
     auto_defer=True,
     guilds=(cfg.control_discord_server_id,),
 )
-@lightbulb.implements(lightbulb.SlashCommand)
-async def add_command(ctx: lightbulb.Context) -> None:
+@lb.implements(lb.SlashCommand)
+async def add_command(ctx: lb.Context) -> None:
     name = ctx.options.name.lower()
     description = ctx.options.description
     text = ctx.options.response
@@ -98,8 +96,8 @@ async def add_command(ctx: lightbulb.Context) -> None:
     await ctx.respond("Command added")
 
 
-@lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
-@lightbulb.option(
+@lb.add_checks(lb.checks.has_roles(cfg.admin_role))
+@lb.option(
     "name",
     "Name of the command to delete",
     type=str,
@@ -108,14 +106,14 @@ async def add_command(ctx: lightbulb.Context) -> None:
     # This is left in in case we modify command_registry in the future
     choices=[cmd for cmd in command_registry.keys()],
 )
-@lightbulb.command(
+@lb.command(
     "delete",
     "Delete a command from the bot",
     auto_defer=True,
     guilds=(cfg.control_discord_server_id,),
 )
-@lightbulb.implements(lightbulb.SlashCommand)
-async def del_command(ctx: lightbulb.Context) -> None:
+@lb.implements(lb.SlashCommand)
+async def del_command(ctx: lb.Context) -> None:
     bot = ctx.bot
     name = ctx.options.name.lower()
 
@@ -133,26 +131,26 @@ async def del_command(ctx: lightbulb.Context) -> None:
     RefreshCmdListEvent(bot).dispatch()
 
 
-@lightbulb.add_checks(lightbulb.checks.has_roles(cfg.admin_role))
-@lightbulb.option(
+@lb.add_checks(lb.checks.has_roles(cfg.admin_role))
+@lb.option(
     "new_description",
     "Description of the command to edit",
     type=str,
     default="",
 )
-@lightbulb.option(
+@lb.option(
     "new_response",
     "Replace the response field in the command with this",
     type=str,
     default="",
 )
-@lightbulb.option(
+@lb.option(
     "new_name",
     "Replace the name of the command with this",
     type=str,
     default="",
 )
-@lightbulb.option(
+@lb.option(
     "name",
     "Name of the command to edit",
     type=str,
@@ -161,14 +159,14 @@ async def del_command(ctx: lightbulb.Context) -> None:
     # This is left in in case we modify command_registry in the future
     choices=[cmd for cmd in command_registry.keys()],
 )
-@lightbulb.command(
+@lb.command(
     "edit",
     "Edit a command",
     auto_defer=True,
     guilds=(cfg.control_discord_server_id,),
 )
-@lightbulb.implements(lightbulb.SlashCommand)
-async def edit_command(ctx: lightbulb.Context):
+@lb.implements(lb.SlashCommand)
+async def edit_command(ctx: lb.Context):
     bot = ctx.bot
     async with db_session() as session:
         async with session.begin():
@@ -241,9 +239,9 @@ async def edit_command(ctx: lightbulb.Context):
             await ctx.respond("Command updated")
 
 
-@lightbulb.command("lstoday", "Find out about today's lost sector", auto_defer=True)
-@lightbulb.implements(lightbulb.SlashCommand)
-async def ls_command(ctx: lightbulb.Context):
+@lb.command("lstoday", "Find out about today's lost sector", auto_defer=True)
+@lb.implements(lb.SlashCommand)
+async def ls_command(ctx: lb.Context):
     async with db_session() as session:
         async with session.begin():
             settings: ls.LostSectorPostSettings = await session.get(
@@ -261,7 +259,7 @@ async def command_options_updater(event: RefreshCmdListEvent):
         await event.app.sync_application_commands()
 
 
-async def register_commands_on_startup(event: hikari.StartingEvent):
+async def register_commands_on_startup(event: h.StartingEvent):
     """Register additional text commands from db."""
     logger.info("Registering commands")
     async with db_session() as session:
@@ -280,8 +278,8 @@ async def register_commands_on_startup(event: hikari.StartingEvent):
     RefreshCmdListEvent(event.app, sync=False).dispatch()
 
 
-async def on_error(event: lightbulb.CommandErrorEvent):
-    if isinstance(event.exception, lightbulb.errors.MissingRequiredRole):
+async def on_error(event: lb.CommandErrorEvent):
+    if isinstance(event.exception, lb.errors.MissingRequiredRole):
         await event.context.respond("Permission denied")
         logger.warning(
             "Note: privlidged command access attempt by uid: {}, name: {}#{}".format(
@@ -294,20 +292,20 @@ async def on_error(event: lightbulb.CommandErrorEvent):
         raise event.exception.__cause__ or event.exception
 
 
-def register(bot: lightbulb.BotApp):
+def register(bot: lb.BotApp):
     # Register all commands and listeners with the bot
     for command in [add_command, del_command, edit_command, ls_command]:
         bot.command(command)
 
     for event, handler in [
         (RefreshCmdListEvent, command_options_updater),
-        (hikari.StartingEvent, register_commands_on_startup),
-        (lightbulb.CommandErrorEvent, on_error),
+        (h.StartingEvent, register_commands_on_startup),
+        (lb.CommandErrorEvent, on_error),
     ]:
         bot.listen(event)(handler)
 
 
-async def user_command(ctx: lightbulb.Context):
+async def user_command(ctx: lb.Context):
     async with db_session() as session:
         async with session.begin():
             command = (
@@ -331,6 +329,6 @@ async def user_command(ctx: lightbulb.Context):
 
 def db_command_to_lb_user_command(command: Commands):
     # Needs an open db session watching command
-    return lightbulb.command(command.name, command.description, auto_defer=True)(
-        lightbulb.implements(lightbulb.SlashCommand)(user_command)
+    return lb.command(command.name, command.description, auto_defer=True)(
+        lb.implements(lb.SlashCommand)(user_command)
     )

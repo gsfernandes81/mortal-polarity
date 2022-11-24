@@ -19,8 +19,8 @@ import logging
 from calendar import month_name as month
 from typing import List, Tuple, Type
 
-import hikari
-import lightbulb
+import hikari as h
+import lightbulb as lb
 import tweepy
 from lightbulb.ext import wtf
 from pytz import utc
@@ -63,7 +63,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
         + "ℹ️ : https://lostsectortoday.com/"
     )
 
-    async def get_announce_embed(self, date: dt.date = None) -> hikari.Embed:
+    async def get_announce_embed(self, date: dt.date = None) -> h.Embed:
         buffer = 1  # Minute
         if date is None:
             date = dt.datetime.now(tz=utc) - dt.timedelta(hours=16, minutes=60 - buffer)
@@ -83,7 +83,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
             "ls_url": ls_gfx_url,
         }
 
-        return hikari.Embed(
+        return h.Embed(
             title="**Lost Sector Today**".format(**format_dict),
             description=(
                 "⠀\n<:LS:849727805994565662> **{sector.name}\n\n".format(
@@ -143,7 +143,7 @@ class LostSectorDiscordSignal(BaseCustomEvent):
     pass
 
 
-async def ls_control(ctx: lightbulb.Context):
+async def ls_control(ctx: lb.Context):
     option = True if ctx.options.option.lower() == "enable" else False
     async with db_session() as session:
         async with session.begin():
@@ -158,17 +158,17 @@ async def ls_control(ctx: lightbulb.Context):
     )
 
 
-async def ls_announce(ctx: lightbulb.Context):
+async def ls_announce(ctx: lb.Context):
     await ctx.respond("Announcing now")
     ctx.bot.dispatch(LostSectorSignal(ctx.bot))
 
 
-async def ls_twitter_announce(ctx: lightbulb.Context):
+async def ls_twitter_announce(ctx: lb.Context):
     await ctx.respond("Announcing to twitter now")
     ctx.bot.dispatch(LostSectorTwitterSignal(ctx.bot))
 
 
-async def ls_discord_announce(ctx: lightbulb.Context):
+async def ls_discord_announce(ctx: lb.Context):
     await ctx.respond("Announcing to discord now")
     ctx.bot.dispatch(LostSectorDiscordSignal(ctx.bot))
 
@@ -188,7 +188,7 @@ class LostSectors(AutopostsBase):
             )
         )
 
-    def register(self, bot: lightbulb.BotApp) -> None:
+    def register(self, bot: lb.BotApp) -> None:
         LostSectorSignal(bot).arm()
         LostSectorAutopostChannel.register(
             bot, self.autopost_cmd_group, LostSectorSignal
@@ -200,7 +200,7 @@ class LostSectors(AutopostsBase):
 
     def commands(self):
         return wtf.Command[
-            wtf.Implements[lightbulb.SlashSubGroup],
+            wtf.Implements[lb.SlashSubGroup],
             wtf.Name["ls"],
             wtf.Description["Lost sector announcement management"],
             wtf.Guilds[cfg.control_discord_server_id],
@@ -220,7 +220,7 @@ class LostSectors(AutopostsBase):
                             wtf.Required[True],
                         ],
                     ],
-                    wtf.Implements[lightbulb.SlashSubCommand],
+                    wtf.Implements[lb.SlashSubCommand],
                     wtf.Executes[ls_control],
                 ],
                 wtf.Command[
@@ -230,14 +230,14 @@ class LostSectors(AutopostsBase):
                     ],
                     wtf.Executes[self.update],
                     wtf.InheritChecks[True],
-                    wtf.Implements[lightbulb.SlashSubCommand],
+                    wtf.Implements[lb.SlashSubCommand],
                 ],
                 wtf.Command[
                     wtf.Name["announce"],
                     wtf.Description["Trigger an announcement manually"],
                     wtf.AutoDefer[True],
                     wtf.InheritChecks[True],
-                    wtf.Implements[lightbulb.SlashSubCommand],
+                    wtf.Implements[lb.SlashSubCommand],
                     wtf.Executes[ls_announce],
                 ],
                 wtf.Command[
@@ -245,7 +245,7 @@ class LostSectors(AutopostsBase):
                     wtf.Description["Trigger a twitter announcement manually"],
                     wtf.AutoDefer[True],
                     wtf.InheritChecks[True],
-                    wtf.Implements[lightbulb.SlashSubCommand],
+                    wtf.Implements[lb.SlashSubCommand],
                     wtf.Executes[ls_twitter_announce],
                 ],
                 wtf.Command[
@@ -253,13 +253,13 @@ class LostSectors(AutopostsBase):
                     wtf.Description["Trigger a discord-only announcement manually"],
                     wtf.AutoDefer[True],
                     wtf.InheritChecks[True],
-                    wtf.Implements[lightbulb.SlashSubCommand],
+                    wtf.Implements[lb.SlashSubCommand],
                     wtf.Executes[ls_discord_announce],
                 ],
             ],
         ]
 
-    async def update(self, ctx: lightbulb.Context):
+    async def update(self, ctx: lb.Context):
         """Correct a mistake in the announcement"""
         change = ctx.options.change if ctx.options.change else ""
         async with db_session() as session:

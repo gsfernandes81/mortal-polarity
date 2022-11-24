@@ -15,8 +15,8 @@
 
 import logging
 
-import hikari
-import lightbulb
+import hikari as h
+import lightbulb as lb
 import uvloop
 from lightbulb.ext import tasks
 
@@ -27,21 +27,21 @@ from .weekly_reset import weekly_reset
 from .xur import xur
 
 uvloop.install()
-bot: lightbulb.BotApp = lightbulb.BotApp(**cfg.lightbulb_params)
+bot: lb.BotApp = lb.BotApp(**cfg.lb_params)
 
 logger = logging.getLogger(__name__)
 
 
 @tasks.task(m=30, auto_start=True, wait_before_execution=False)
 async def autoupdate_status():
-    if not bot.d.has_lightbulb_started:
-        await bot.wait_for(lightbulb.events.LightbulbStartedEvent, timeout=None)
+    if not bot.d.has_lb_started:
+        await bot.wait_for(lb.events.LightbulbStartedEvent, timeout=None)
         bot.d.has_lightbulb_started = True
 
     await bot.update_presence(
-        activity=hikari.Activity(
+        activity=h.Activity(
             name="{} servers : )".format(len(bot.cache.get_guilds_view())),
-            type=hikari.ActivityType.LISTENING,
+            type=h.ActivityType.LISTENING,
         )
     )
 
