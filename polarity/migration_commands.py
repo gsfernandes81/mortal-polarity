@@ -148,6 +148,7 @@ async def migrate(ctx: lb.Context):
             forbidden = 0
             bad_request = 0
             not_guild = 0
+            misc_exception = 0
             migrated = 0
             iterations = 0
 
@@ -193,6 +194,9 @@ async def migrate(ctx: lb.Context):
                         not_found += 1
                     except AttributeError:
                         not_guild += 1
+                    except Exception as e:
+                        logger.exception(e)
+                        misc_exception += 1
                     else:
                         channel_record.enabled = False
                         session.add(channel_record)
@@ -209,6 +213,7 @@ async def migrate(ctx: lb.Context):
                                 + "{} forbidden\n".format(forbidden)
                                 + "{} not found\n".format(not_found)
                                 + "{} not in a guild\n".format(not_guild)
+                                + "{} misc exception\n".format(misc_exception)
                                 + "{} successfully migrated\n".format(migrated)
                                 + "{} total".format(iterations)
                             )
