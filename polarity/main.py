@@ -27,7 +27,7 @@ from .weekly_reset import weekly_reset
 from .xur import xur
 
 uvloop.install()
-bot: lb.BotApp = lb.BotApp(**cfg.lb_params)
+bot: lb.BotApp = lb.BotApp(**cfg.lightbulb_params)
 
 logger = logging.getLogger(__name__)
 
