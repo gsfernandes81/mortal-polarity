@@ -81,7 +81,7 @@ async def _create_or_get(cls, id, **kwargs):
 def operation_timer(op_name, logger=logging.getLogger("main/" + __name__)):
     start_time = dt.datetime.now()
     logger.info("Announce started".format(name=op_name))
-    yield
+    yield lambda t: (t - start_time).total_seconds()
     end_time = dt.datetime.now()
     time_delta = end_time - start_time
     minutes = time_delta.seconds // 60
