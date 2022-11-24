@@ -100,26 +100,29 @@ class BaseChannelRecord:
             else cls.control_command_name
         )
         cmd_group.child(
-            lb.option(
-                "option",
-                "Enabled or disabled",
-                type=str,
-                choices=["Enable", "Disable"],
-                required=True,
-            )(
-                lb.command(
-                    cls.control_command_name.lower().replace(" ", "_"),
-                    "{} auto posts".format(cls.control_command_name.capitalize()),
-                    auto_defer=True,
-                    guilds=cfg.control_discord_server_id,
-                    inherit_checks=True,
+            lb.app_command_permissions(dm_enabled=False)(
+                lb.option(
+                    "option",
+                    "Enabled or disabled",
+                    type=str,
+                    choices=["Enable", "Disable"],
+                    required=True,
                 )(
-                    lb.implements(lb.SlashSubCommand)(
-                        functools.partial(cls.autopost_ctrl_usr_cmd, cls)
+                    lb.command(
+                        cls.control_command_name.lower().replace(" ", "_"),
+                        "{} auto posts".format(cls.control_command_name.capitalize()),
+                        auto_defer=True,
+                        guilds=cfg.control_discord_server_id,
+                        inherit_checks=True,
+                    )(
+                        lb.implements(lb.SlashSubCommand)(
+                            functools.partial(cls.autopost_ctrl_usr_cmd, cls)
+                        )
                     )
                 )
             )
         )
+
         bot.listen(announce_event)(cls.announcer)
 
     @staticmethod
@@ -222,7 +225,7 @@ class BaseChannelRecord:
                         *[
                             _send_embed(
                                 channel_record,
-                                event,
+                                event.bot,
                                 _embed_for_migration(embed),
                                 cls,
                                 logger=logger,
@@ -238,7 +241,7 @@ class BaseChannelRecord:
                             *[
                                 _send_embed(
                                     channel_record,
-                                    event,
+                                    event.bot,
                                     embed,
                                     cls,
                                     logger=logger,

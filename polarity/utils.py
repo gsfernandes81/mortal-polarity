@@ -178,30 +178,18 @@ async def _bot_has_webhook_perms(
 
 async def _send_embed(
     channel_record,
-    event: h.Event,
+    bot: lb.BotApp,
     embed: h.Embed,
     channel_table,  # Must be the class of the channel, not an instance
     logger=logging.getLogger("main/" + __name__),
-    components: List[h.PartialComponent] = None,
+    components: h.UndefinedOr[List[h.PartialComponent]] = h.UNDEFINED,
 ) -> None:
-    bot: lb.BotApp = event.bot
-    follow_channel: h.SnowflakeishOr[h.GuildChannel] = channel_table.follow_channel
     try:
         channel = bot.cache.get_guild_channel(
             channel_record.id
         ) or await bot.rest.fetch_channel(channel_record.id)
-        try:
-            channel.guild_id
-        except AttributeError:
-            # Ignore channels not in a guild
-            return
 
-        if components is None:
-            message = await channel.send(
-                embed=embed,
-            )
-        else:
-            message = await channel.send(embed=embed, components=components)
+        message = await channel.send(embed=embed, components=components)
         channel_record.last_msg_id = message.id
 
         if channel_record.server_id == cfg.kyber_discord_server_id:
