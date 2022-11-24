@@ -151,7 +151,7 @@ async def migrate(ctx: lb.Context):
             iterations = 0
 
             await ctx.respond(
-                content="Migrating {} channels:\n".format(len(channel_record_list))
+                content="Migrating {} channels\n".format(len(channel_record_list))
             )
             await asyncio.sleep(3)
 
@@ -209,6 +209,8 @@ async def migrate(ctx: lb.Context):
                                 + "{} not in a guild\n".format(not_guild)
                                 + "{} total".format(iterations)
                             )
+                            if iterations >= len(channel_record_list):
+                                summary += "\n**Operation complete**"
                             await ctx.edit_last_response(content=summary)
 
 
