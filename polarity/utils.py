@@ -182,6 +182,7 @@ async def _send_embed(
     embed: h.Embed,
     channel_table,  # Must be the class of the channel, not an instance
     logger=logging.getLogger("main/" + __name__),
+    components: List[h.PartialComponent] = None,
 ) -> None:
     bot: lb.BotApp = event.bot
     follow_channel: h.SnowflakeishOr[h.GuildChannel] = channel_table.follow_channel
@@ -195,31 +196,13 @@ async def _send_embed(
             # Ignore channels not in a guild
             return
 
-        if (
-            channel_record.server_id != cfg.kyber_discord_server_id
-            and not await _bot_has_webhook_perms(bot, channel, True)
-        ):
+        if components is None:
             message = await channel.send(
-                embed=_embed_for_migration(embed),
-                components=_component_for_migration(bot),
+                embed=embed,
             )
         else:
-            try:
-                if follow_channel < 0:
-                    raise FeatureDisabledError
-                await bot.rest.follow_channel(follow_channel, channel)
-            except (
-                h.BadRequestError,
-                h.ForbiddenError,
-                h.NotFoundError,
-            ) as e:
-                logger.exception(e)
-                message = await channel.send(embed=embed)
-                channel_record.last_msg_id = message.id
-            except FeatureDisabledError:
-                # Use follow_channel = -1 as a way to turn off auto follows
-                message = await channel.send(embed=embed)
-                channel_record.last_msg_id = message.id
+            message = await channel.send(embed=embed, components=components)
+        channel_record.last_msg_id = message.id
 
         if channel_record.server_id == cfg.kyber_discord_server_id:
             await bot.rest.crosspost_message(channel, message)
