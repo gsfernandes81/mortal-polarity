@@ -18,7 +18,7 @@ import functools
 import logging
 import re
 from abc import ABC, abstractmethod
-from typing import Type, Union
+from typing import Type, Union, List
 
 import hikari as h
 import lightbulb as lb
@@ -30,11 +30,12 @@ from sqlalchemy.sql.schema import Column
 from . import cfg, custom_checks
 from .controller import kyber as control_cmd_group
 from .utils import (
-    _send_embed,
+    send_message,
     db_session,
     operation_timer,
     _component_for_migration,
     _embed_for_migration,
+    MessageFailureError,
 )
 
 app = web.Application()
@@ -204,57 +205,46 @@ class BaseChannelRecord:
             logger.info(
                 # Note, need to implement regex to specify which announcement
                 # is being carried out in these logs
-                "Announcing posts to {} channels".format(len(channel_record_list))
+                "Announcing posts to {} channels".format(len(channel_id_list))
             )
             with operation_timer("Announce", logger):
                 embed = await settings.get_announce_embed()
-                try:
-                    for channel in channel_record_list:
-                        if channel.id == cls.follow_channel:
-                            follow_channel_record = channel
-                            channel_record_list.remove(channel)
-                        else:
-                            follow_channel_record = None
-                except ValueError:
-                    pass
-                else:
-                    if follow_channel_record is not None:
-                        channel_record_list.append(follow_channel_record)
-                finally:
-                    exceptions = await asyncio.gather(
-                        *[
-                            _send_embed(
-                                channel_record,
+                channel_id_list.remove(cls.follow_channel)
+                exceptions: List[
+                    Union[None, MessageFailureError]
+                ] = await asyncio.gather(
+                    *(
+                        [
+                            send_message(
                                 event.bot,
-                                _embed_for_migration(embed),
-                                cls,
-                                logger=logger,
-                                components=_component_for_migration(event.bot),
+                                cls.follow_channel,
+                                message_kwargs={"embed": embed},
+                                crosspost=True,
                             )
-                            for channel_record in channel_record_list[:-1]
-                        ],
-                        return_exceptions=True
-                    )
-                    # Run the last channel in list (Kyber's announce channel)
-                    exceptions.extend(
-                        await asyncio.gather(
-                            *[
-                                _send_embed(
-                                    channel_record,
-                                    event.bot,
-                                    embed,
-                                    cls,
-                                    logger=logger,
-                                )
-                                for channel_record in channel_record_list[-1:]
-                            ],
-                            return_exceptions=True
-                        )
-                    )
+                        ]
+                        + [
+                            send_message(
+                                event.bot,
+                                channel_id,
+                                message_kwargs={
+                                    "embed": _embed_for_migration(embed),
+                                    "components": _component_for_migration(event.bot),
+                                },
+                            )
+                            for channel_id in channel_id_list
+                        ]
+                    ),
+                    return_exceptions=True
+                )
 
-                    for e in exceptions:
-                        if e is not None:
-                            logger.exception(e)
+                for e in exceptions:
+                    if e is not None:
+                        channel_record = (
+                            await session.execute(select(cls).where(cls.id == e))
+                        ).fetchall()[0][0]
+                        if cfg.disable_bad_channels:
+                            channel_record.enabled = False
+                        logger.exception(e)
 
 
 class BaseCustomEvent(h.Event):

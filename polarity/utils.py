@@ -20,11 +20,12 @@ import datetime as dt
 import functools
 import logging
 import re
+from copy import copy
 from typing import List, Tuple, Union
 
 import aiofiles
 import aiohttp
-from copy import copy
+import attr
 import hikari as h
 import lightbulb as lb
 import toolbox
@@ -176,38 +177,26 @@ async def _bot_has_webhook_perms(
     )
 
 
-async def _send_embed(
-    channel_record,
-    bot: lb.BotApp,
-    embed: h.Embed,
-    channel_table,  # Must be the class of the channel, not an instance
-    logger=logging.getLogger("main/" + __name__),
-    components: h.UndefinedOr[List[h.PartialComponent]] = h.UNDEFINED,
+@attr.s
+class MessageFailureError(Exception):
+    channel_id: int = attr.ib()
+    message_kwargs: dict = attr.ib()
+    source_exception_details: Exception = attr.ib()
+
+
+async def send_message(
+    bot: lb.BotApp, channel_id: int, message_kwargs: dict, crosspost: bool = False
 ) -> None:
     try:
         channel = bot.cache.get_guild_channel(
-            channel_record.id
-        ) or await bot.rest.fetch_channel(channel_record.id)
+            channel_id
+        ) or await bot.rest.fetch_channel(channel_id)
 
-        message = await channel.send(embed=embed, components=components)
-        channel_record.last_msg_id = message.id
-
-        if channel_record.server_id == cfg.kyber_discord_server_id:
+        message = await channel.send(**message_kwargs)
+        if crosspost:
             await bot.rest.crosspost_message(channel, message)
-
-    except (h.ForbiddenError, h.NotFoundError):
-        logger.warning(
-            "Channel {} not found or not messageable, disabling posts in {}".format(
-                channel_record.id, str(channel_table.__class__.__name__)
-            )
-        )
-        async with db_session() as session:
-            async with session.begin():
-                await session.execute(
-                    update(channel_table)
-                    .where(channel_table.id == channel_record.id)
-                    .values(enabled=False)
-                )
+    except Exception as e:
+        raise MessageFailureError(channel_id, message_kwargs, e)
 
 
 async def _edit_embedded_message(
