@@ -38,7 +38,7 @@ from .autopost import (
 from .utils import (
     Base,
     _create_or_get,
-    _discord_alert,
+    alert_owner,
     _download_linked_image,
     _edit_embedded_message,
     _run_in_thread_pool,
@@ -118,6 +118,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
 class LostSectorAutopostChannel(BaseChannelRecord, Base):
     settings_records: Type[BasePostSettings] = LostSectorPostSettings
     follow_channel = cfg.ls_follow_channel_id
+    autopost_friendly_name = "Lost sector autoposts"
 
 
 class LostSectorSignal(BaseCustomEvent):
@@ -330,8 +331,11 @@ class LostSectors(AutopostsBase):
                 file_name,
             )
         except ValueError as err:
-            await _discord_alert(
-                err.args[0], channel=cfg.alerts_channel_id, bot=event.bot, logger=logger
+            await alert_owner(
+                err.args[0],
+                channel=cfg.alerts_channel_id,
+                bot=event.bot,
+                mention_mods=True,
             )
 
     def _announce_to_twitter_sync(self, tweet_string, attachment_file_name=None):

@@ -274,12 +274,11 @@ async def _run_in_thread_pool(func, *args, **kwargs):
         raise exception
 
 
-async def _discord_alert(
+async def alert_owner(
     *args: str,
     bot: lb.BotApp = None,
     channel: Union[None, int, h.TextableChannel],
-    mention_mods: bool = True,
-    logger=logging.getLogger("main/" + __name__)
+    mention_mods: bool = True
 ):
     # Sends an alert in the specified channels
     # logs the same alert
@@ -293,8 +292,6 @@ async def _discord_alert(
 
     if mention_mods:
         alert = alert + "<@&{}> ".format(cfg.admin_role)
-
-    logger.warning(alert)
 
     # If we get a single channel, turn it into a len() = 1 list
     if isinstance(channel, int):

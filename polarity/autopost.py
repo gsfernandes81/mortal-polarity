@@ -36,6 +36,7 @@ from .utils import (
     _component_for_migration,
     _embed_for_migration,
     MessageFailureError,
+    alert_owner,
 )
 
 app = web.Application()
@@ -82,6 +83,9 @@ class BaseChannelRecord:
     control_command_name: str = None
     # Follow channel for this announcement type
     follow_channel: int = None
+    # Name displayed to user for this type of autopost
+    # Must be plural and end with autoposts
+    autopost_friendly_name: str = None
 
     def __init__(self, id: int, server_id: int, enabled: bool):
         self.id = id
@@ -136,23 +140,67 @@ class BaseChannelRecord:
         server_id: int = ctx.guild_id if ctx.guild_id is not None else -1
         option: bool = True if ctx.options.option.lower() == "enable" else False
         bot = ctx.bot
-        if await cls._check_bot_has_message_perms(bot, channel_id):
-            async with db_session() as session:
-                async with session.begin():
-                    channel = await session.get(cls, channel_id)
-                    if channel is None:
-                        channel = cls(channel_id, server_id, option)
-                        session.add(channel)
-                    else:
-                        channel.enabled = option
+
+        try:
+            if option:
+                # Fetch all follow based webhooks that have our channel as a source
+                follow_webhooks = [
+                    hook
+                    for hook in await bot.rest.fetch_channel_webhooks(channel_id)
+                    if isinstance(hook, h.ChannelFollowerWebhook)
+                    and hook.source_channel.id == cls.follow_channel
+                ]
+                if len(follow_webhooks) == 0:
+                    await bot.rest.follow_channel(cls.follow_channel, channel_id)
+                    await ctx.respond("{} enabled".format(cls.autopost_friendly_name))
+                else:
+                    await ctx.respond(
+                        "{} were already enabled".format(cls.autopost_friendly_name)
+                    )
+            else:
+                # Fetch all follow based webhooks that have our channel as a source
+                follow_webhooks = [
+                    hook
+                    for hook in await bot.rest.fetch_channel_webhooks(channel_id)
+                    if isinstance(hook, h.ChannelFollowerWebhook)
+                    and hook.source_channel.id == cls.follow_channel
+                ]
+                if len(follow_webhooks) == 0:
+                    await ctx.respond(
+                        "{} were already disabled.".format(cls.autopost_friendly_name)
+                    )
+                else:
+                    [await bot.rest.delete_webhook(hook) for hook in follow_webhooks]
+                    await ctx.respond("{} disabled".format(cls.autopost_friendly_name))
+
+        except h.ForbiddenError:
+            owner = await bot.rest.fetch_user((await bot.fetch_owner_ids())[0])
             await ctx.respond(
-                " ".join(re.findall("[A-Z][^A-Z]*", cls.__name__)[:-2])
-                + " autoposts {}".format("enabled" if option else "disabled")
+                (
+                    'The bot does not have the "Manage Webhooks" permission here. '
+                    + "Please reinvite the bot with the below button "
+                    + "or contact {}#{} for assistance"
+                ).format(owner.username, owner.discriminator),
+                components=_component_for_migration(bot),
             )
-        else:
+        except Exception as e:
+            owner = await bot.rest.fetch_user((await bot.fetch_owner_ids())[0])
             await ctx.respond(
-                'The bot does not have the "Send Messages" or the'
-                + ' "Send Messages in Threads" permission here'
+                "An unrecognized error has occured, please message {}#{}".format(
+                    owner.username, owner.discriminator
+                )
+            )
+            logger.exception(e)
+            await alert_owner(
+                "An autopost follow command for\nchannel id:",
+                channel_id,
+                "\nserver id:",
+                server_id,
+                "\nhas failed with exception:",
+                e,
+                bot=bot,
+                mention_mods=True,
+                channel=cfg.alerts_channel_id,
             )
 
     @staticmethod
@@ -308,7 +356,8 @@ class WeekendResetSignal(ResetSignal):
 
 
 @lb.add_checks(
-    lb.checks.dm_only | custom_checks.has_guild_permissions(h.Permissions.ADMINISTRATOR)
+    custom_checks.has_guild_permissions(h.Permissions.MANAGE_WEBHOOKS)
+    | custom_checks.has_guild_permissions(h.Permissions.ADMINISTRATOR)
 )
 @lb.command(
     "autopost", "Server autopost management, can be used by server administrators only"
@@ -327,7 +376,8 @@ async def announcements_error_handler(
     ctx = event.context
     await ctx.respond(
         "You cannot change this setting because you "
-        + 'do not have "Administrator" permissions in this server'
+        + "do not have Administrator or Manage Webhooks "
+        + "permissions in this server"
     )
 
 
