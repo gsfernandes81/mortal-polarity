@@ -203,40 +203,6 @@ class BaseChannelRecord:
                 channel=cfg.alerts_channel_id,
             )
 
-    @staticmethod
-    async def _check_bot_has_message_perms(
-        bot: lb.BotApp, channel: Union[h.TextableChannel, int]
-    ) -> bool:
-        if not isinstance(channel, h.TextableChannel):
-            # Get channel from cache if possible
-            channel = bot.cache.get_guild_channel(
-                channel
-            ) or await bot.rest.fetch_channel(channel)
-
-        if isinstance(channel, h.TextableChannel):
-            if isinstance(channel, h.TextableGuildChannel):
-                guild = channel.get_guild() or await channel.fetch_guild()
-                self_member = bot.cache.get_member(
-                    guild, bot.get_me()
-                ) or await bot.rest.fetch_member(guild, bot.get_me())
-                perms = lb.utils.permissions_in(channel, self_member)
-                # Check if we have the send messages permission in the channel
-                # Refer to h.Permissions to see how / why this works
-                # Note: hikari doesn't recognize threads
-                # Channel types 10, 11, 12 and 15 are thread types as specified in:
-                # https://discord.com/developers/docs/resources/channel#channel-object-channel-types
-                # If the channel is a thread, we need to check for the SEND_MESSAGES_IN_THREADS perm
-                if channel.type in [10, 11, 12, 15]:
-                    return (
-                        h.Permissions.SEND_MESSAGES_IN_THREADS & perms
-                    ) == h.Permissions.SEND_MESSAGES_IN_THREADS
-                else:
-                    return (
-                        h.Permissions.SEND_MESSAGES & perms
-                    ) == h.Permissions.SEND_MESSAGES
-            else:
-                return True
-
     @classmethod
     async def announcer(cls, event):
         async with db_session() as session:
