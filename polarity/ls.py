@@ -122,25 +122,34 @@ class LostSectorAutopostChannel(BaseChannelRecord, Base):
 
 
 class LostSectorSignal(BaseCustomEvent):
-    async def conditional_daily_reset_repeater(self, event: DailyResetSignal) -> None:
-        if await self.is_autoannounce_enabled():
-            event.bot.dispatch(self)
+    @classmethod
+    async def conditional_daily_reset_repeater(cls, event: DailyResetSignal) -> None:
+        """Dispatched self if autoannounces are enabled in the settings object"""
+        if await cls.is_autoannounce_enabled():
+            cls.dispatch_with(bot=event.app)
 
-    async def is_autoannounce_enabled(self):
+    @classmethod
+    async def is_autoannounce_enabled(cls):
+        """Checks if autoannounces are enabled in the settings object"""
         settings = await _create_or_get(
             LostSectorPostSettings, 0, autoannounce_enabled=True
         )
         return settings.autoannounce_enabled
 
-    def arm(self) -> None:
-        self.bot.listen()(self.conditional_daily_reset_repeater)
+    @classmethod
+    def register(cls, bot) -> None:
+        self = super().register(bot)
+        self.app.listen()(cls.conditional_daily_reset_repeater)
+        return self
 
 
 class LostSectorTwitterSignal(BaseCustomEvent):
+    "Signal to trigger a twitter specific lost sector post"
     pass
 
 
 class LostSectorDiscordSignal(BaseCustomEvent):
+    "Signal to trigger a discord specific lost sector post"
     pass
 
 
@@ -161,17 +170,17 @@ async def ls_control(ctx: lb.Context):
 
 async def ls_announce(ctx: lb.Context):
     await ctx.respond("Announcing now")
-    ctx.bot.dispatch(LostSectorSignal(ctx.bot))
+    LostSectorSignal.dispatch_with(bot=ctx.bot)
 
 
 async def ls_twitter_announce(ctx: lb.Context):
     await ctx.respond("Announcing to twitter now")
-    ctx.bot.dispatch(LostSectorTwitterSignal(ctx.bot))
+    LostSectorTwitterSignal.dispatch_with(bot=ctx.bot)
 
 
 async def ls_discord_announce(ctx: lb.Context):
     await ctx.respond("Announcing to discord now")
-    ctx.bot.dispatch(LostSectorDiscordSignal(ctx.bot))
+    LostSectorDiscordSignal.dispatch_with(bot=ctx.bot)
 
 
 class LostSectors(AutopostsBase):
@@ -190,7 +199,7 @@ class LostSectors(AutopostsBase):
         )
 
     def register(self, bot: lb.BotApp) -> None:
-        LostSectorSignal(bot).arm()
+        LostSectorSignal.register(bot)
         LostSectorAutopostChannel.register(
             bot, self.autopost_cmd_group, LostSectorSignal
         )

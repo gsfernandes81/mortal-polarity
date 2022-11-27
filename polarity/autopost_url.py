@@ -199,34 +199,44 @@ class UrlAutopostChannel(BaseChannelRecord):
 
 
 class BaseUrlSignal(BaseCustomEvent):
-    # NOTE this must be specified on subclassing
+    """Base class for URL autopost signals
+
+    NOTE these must be specified on subclassing:
+    - settings_table: Type[UrlPostSettings]
+    - trigger_on_signal: h.Event"""
+
     settings_table: Type[UrlPostSettings]
     trigger_on_signal: h.Event
 
-    async def conditional_reset_repeater(self, event) -> None:
-        if not await self.is_autoannounce_enabled():
+    @classmethod
+    async def conditional_reset_repeater(cls, event: h.Event) -> None:
+        """When awaited, waits for the settings.wait_for_url_update method to return
+        and then fires itself as a signal"""
+        if not await cls.is_autoannounce_enabled():
             return
-
-        settings: UrlPostSettings = await _create_or_get(self.settings_table, 0)
 
         # Debug code
         if cfg.test_env and cfg.trigger_without_url_update:
-            event.bot.dispatch(self)
+            cls.dispatch_with(bot=event.app)
 
-        await settings.wait_for_url_update()
-        event.bot.dispatch(self)
+        await cls.wait_for_url_update()
+        cls.dispatch_with(bot=event.app)
 
-    async def is_autoannounce_enabled(self):
+    @classmethod
+    async def is_autoannounce_enabled(cls):
         settings = await _create_or_get(
-            self.settings_table, 0, autoannounce_enabled=True
+            cls.settings_table, 0, autoannounce_enabled=True
         )
         return settings.autoannounce_enabled
 
-    def arm(self) -> None:
-        self.bot.listen(self.trigger_on_signal)(self.conditional_reset_repeater)
+    @classmethod
+    def register(cls, bot: lb.BotApp) -> None:
+        bot.listen(cls.trigger_on_signal)(cls.conditional_reset_repeater)
 
-    async def wait_for_url_update(self):
-        settings: UrlPostSettings = await _create_or_get(self.settings_table, 0)
+    @classmethod
+    async def wait_for_url_update(cls) -> None:
+        """Waits for the settings.wait_for_url_update() method to return before returning"""
+        settings: UrlPostSettings = await _create_or_get(cls.settings_table, 0)
         await settings.wait_for_url_update()
 
 
@@ -258,7 +268,7 @@ class UrlAutopostsBase(AutopostsBase):
             )
             self.settings_table.register_embed_user_cmd(bot)
             self.control_cmd_group.child(self.commands())
-            self.autopost_trigger_signal(bot).arm()
+            self.autopost_trigger_signal.register(bot)
         except lb.CommandAlreadyExists:
             pass
         finally:
@@ -489,5 +499,5 @@ class UrlAutopostsBase(AutopostsBase):
 
     # Manually trigger an announcement event
     async def manual_announce(self, ctx: lb.Context):
-        ctx.bot.dispatch(self.autopost_trigger_signal(ctx.bot))
+        self.autopost_trigger_signal.dispatch_with(bot=ctx.bot)
         await ctx.respond("Announcements being sent out now")

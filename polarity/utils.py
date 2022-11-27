@@ -53,21 +53,6 @@ class FeatureDisabledError(Exception):
     pass
 
 
-class RefreshCmdListEvent(h.Event):
-    def __init__(self, bot: h.GatewayBot, sync: bool = True):
-        super().__init__()
-        # Whether to run the sync_application_commands method of the app
-        self.bot = bot
-        self.sync = sync
-
-    @property
-    def app(self):
-        return self.bot
-
-    def dispatch(self):
-        self.bot.event_manager.dispatch(self)
-
-
 async def _create_or_get(cls, id, **kwargs):
     async with db_session() as session:
         async with session.begin():
