@@ -231,7 +231,9 @@ class BaseUrlSignal(BaseCustomEvent):
 
     @classmethod
     def register(cls, bot: lb.BotApp) -> None:
-        bot.listen(cls.trigger_on_signal)(cls.conditional_reset_repeater)
+        self = super().register(bot)
+        bot.listen(self.trigger_on_signal)(self.conditional_reset_repeater)
+        return self
 
     @classmethod
     async def wait_for_url_update(cls) -> None:
