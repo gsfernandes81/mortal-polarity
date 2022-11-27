@@ -24,6 +24,7 @@
 # https://github.com/agronholm/apscheduler/issues/465
 
 import asyncio
+import datetime as dt
 
 import aiohttp
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
@@ -79,12 +80,24 @@ async def remote_weekend_reset():
 # This needs to be called at release
 def add_remote_announce():
     # (Re)Add the scheduled job that signals destiny 2 reset
+
+    test_time = dt.datetime.now() + dt.timedelta(minutes=2)
+    test_cron_dict = {
+        "year": test_time.year,
+        "month": test_time.month,
+        "day": test_time.day,
+        "hour": test_time.hour,
+        "minute": test_time.minute,
+    }
+
     _scheduler.add_job(
         remote_daily_reset,
         CronTrigger(
             hour=17,
             timezone=utc,
-        ),
+        )
+        if not cfg.test_env
+        else CronTrigger(**test_cron_dict),
         replace_existing=True,
         id="0",
     )
@@ -94,7 +107,9 @@ def add_remote_announce():
             day_of_week="tue",
             hour=17,
             timezone=utc,
-        ),
+        )
+        if not cfg.test_env
+        else CronTrigger(**test_cron_dict),
         replace_existing=True,
         id="1",
     )
@@ -104,7 +119,9 @@ def add_remote_announce():
             day_of_week="fri",
             hour=17,
             timezone=utc,
-        ),
+        )
+        if not cfg.test_env
+        else CronTrigger(**test_cron_dict),
         replace_existing=True,
         id="2",
     )
