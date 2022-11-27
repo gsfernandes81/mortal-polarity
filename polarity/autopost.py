@@ -254,7 +254,9 @@ class BaseChannelRecord:
                 for e in exceptions:
                     if e is not None:
                         channel_record = (
-                            await session.execute(select(cls).where(cls.id == e))
+                            await session.execute(
+                                select(cls).where(cls.id == e.channel_id)
+                            )
                         ).fetchall()[0][0]
                         if cfg.disable_bad_channels:
                             channel_record.enabled = False
