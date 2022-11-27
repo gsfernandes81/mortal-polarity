@@ -13,7 +13,6 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio
 import datetime as dt
 import logging
 
@@ -26,6 +25,8 @@ from . import cfg, ls, weekly_reset, xur
 from .utils import FeatureDisabledError, db_session, operation_timer
 
 logger = logging.getLogger(__name__)
+
+embed_color = h.Color.from_hex_code("#a96eca")
 
 
 @lb.add_checks(lb.checks.has_roles(cfg.admin_role))
@@ -44,7 +45,7 @@ async def migratability(ctx: lb.Context) -> None:
     embed = h.Embed(
         title="Migratability measure",
         description="Proportion of channels migratable to the new follow system\n",
-        color=h.Color.from_hex_code("#a96eca"),
+        color=embed_color,
     )
     for channel_type, channel_record in [
         ("LS", ls.LostSectorAutopostChannel),
@@ -107,11 +108,6 @@ async def migratability(ctx: lb.Context) -> None:
 
 
 @lb.add_checks(lb.checks.has_roles(cfg.admin_role))
-@lb.option(
-    name="channel",
-    description="Which announce channel to migrate",
-    choices=["ls", "xur", "reset"],
-)
 @lb.command(
     name="migrate",
     description="Move to the new system",
@@ -122,27 +118,24 @@ async def migratability(ctx: lb.Context) -> None:
 async def migrate(ctx: lb.Context):
     bot: lb.BotApp = ctx.bot
 
-    if ctx.options.channel == "ls":
-        follow_channel = cfg.ls_follow_channel_id
-        channel_table = ls.LostSectorAutopostChannel
-    elif ctx.options.channel == "xur":
-        follow_channel = cfg.xur_follow_channel_id
-        channel_table = xur.XurAutopostChannel
-    elif ctx.options.channel == "reset":
-        follow_channel = cfg.reset_follow_channel_id
-        channel_table = weekly_reset.WeeklyResetAutopostChannel
-
+    channel_record_list_all_types = []
     async with db_session() as session:
         async with session.begin():
-            channel_record_list = (
-                await session.execute(
-                    select(channel_table).where(channel_table.enabled == True)
+            for follow_channel, channel_table in [
+                (cfg.ls_follow_channel_id, ls.LostSectorAutopostChannel),
+                (cfg.xur_follow_channel_id, xur.XurAutopostChannel),
+                (cfg.reset_follow_channel_id, weekly_reset.WeeklyResetAutopostChannel),
+            ]:
+                channel_record_list = (
+                    await session.execute(
+                        select(channel_table).where(channel_table.enabled == True)
+                    )
+                ).fetchall()
+                channel_record_list = (
+                    [] if channel_record_list is None else channel_record_list
                 )
-            ).fetchall()
-            channel_record_list = (
-                [] if channel_record_list is None else channel_record_list
-            )
-            channel_record_list = [channel[0] for channel in channel_record_list]
+                channel_record_list = [channel[0] for channel in channel_record_list]
+                channel_record_list_all_types.extend(channel_record_list)
 
             not_found = 0
             forbidden = 0
@@ -152,13 +145,35 @@ async def migrate(ctx: lb.Context):
             migrated = 0
             iterations = 0
 
-            await ctx.respond(
-                content="Migrating {} channels\n".format(len(channel_record_list))
+            reporting_embed = (
+                h.Embed(
+                    title="Follow system migration",
+                    description="Operation progress / summary",
+                    color=embed_color,
+                )
+                .add_field(
+                    name="Errors",
+                    value="{} bad requests\n".format(bad_request)
+                    + "{} forbidden\n".format(forbidden)
+                    + "{} not found\n".format(not_found)
+                    + "{} not in a guild\n".format(not_guild)
+                    + "{} misc exception\n".format(misc_exception),
+                )
+                .add_field(
+                    name="Successfully migrated",
+                    value="{} successfully migrated\n".format(migrated),
+                )
+                .add_field(
+                    name="Progress",
+                    value="{} / {}".format(
+                        iterations, len(channel_record_list_all_types)
+                    ),
+                )
             )
-            await asyncio.sleep(3)
+            await ctx.respond(embed=reporting_embed)
 
             with operation_timer("Migrate") as time_till:
-                for channel_record in channel_record_list:
+                for channel_record in channel_record_list_all_types:
                     try:
                         channel = bot.cache.get_guild_channel(
                             channel_record.id
@@ -192,6 +207,7 @@ async def migrate(ctx: lb.Context):
                         forbidden += 1
                     except h.NotFoundError:
                         not_found += 1
+                        channel_record.enabled = False
                     except AttributeError:
                         not_guild += 1
                     except Exception as e:
@@ -205,21 +221,28 @@ async def migrate(ctx: lb.Context):
                         iterations += 1
                         rate = time_till(dt.datetime.now()) / iterations
                         if iterations % round(10 / rate) == 0 or iterations >= len(
-                            channel_record_list
+                            channel_record_list_all_types
                         ):
-                            summary = (
-                                "**Operation progress / summary**\n"
-                                + "{} bad requests\n".format(bad_request)
+                            reporting_embed.edit_field(
+                                0,
+                                h.UNDEFINED,
+                                "{} bad requests\n".format(bad_request)
                                 + "{} forbidden\n".format(forbidden)
                                 + "{} not found\n".format(not_found)
                                 + "{} not in a guild\n".format(not_guild)
-                                + "{} misc exception\n".format(misc_exception)
-                                + "{} successfully migrated\n".format(migrated)
-                                + "{} total".format(iterations)
+                                + "{} misc exception\n".format(misc_exception),
+                            ).edit_field(
+                                1,
+                                h.UNDEFINED,
+                                "{} successfully migrated\n".format(migrated),
+                            ).edit_field(
+                                2,
+                                h.UNDEFINED,
+                                "{} / {}".format(
+                                    iterations, len(channel_record_list_all_types)
+                                ),
                             )
-                            if iterations >= len(channel_record_list):
-                                summary += "\n**Operation complete**"
-                            await ctx.edit_last_response(content=summary)
+                            await ctx.edit_last_response(embed=reporting_embed)
 
 
 def register_all(bot: lb.BotApp) -> None:
