@@ -64,10 +64,31 @@ class LostSectorPostSettings(BasePostSettings, Base):
     )
 
     async def get_announce_embed(self, date: dt.date = None) -> h.Embed:
+        buffer = 1  # Minute
+        if date is None:
+            date = dt.datetime.now(tz=utc) - dt.timedelta(hours=16, minutes=60 - buffer)
+        else:
+            date = date + dt.timedelta(minutes=buffer)
+        rot = Rotation.from_gspread_url(
+            cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=buffer
+        )()
+
+        # Follow the hyperlink to have the newest image embedded
+        ls_gfx_url = await follow_link_single_step(rot.shortlink_gfx)
+
+        format_dict = {
+            "month": month[date.month],
+            "day": date.day,
+            "sector": rot,
+            "ls_url": ls_gfx_url,
+        }
+
         return h.Embed(
-            title="**Lost Sector Today**",
+            title="**Lost Sector Today**".format(**format_dict),
             description=(
-                "⠀\n<:LS:849727805994565662> **{sector.name}\n\n"
+                "⠀\n<:LS:849727805994565662> **{sector.name}\n\n".format(
+                    **format_dict
+                ).replace(" (", "** (", 1)
                 + "• **Reward (If-Solo)**: {sector.reward}\n"
                 + "• **Champs**: {sector.champions}\n"
                 + "• **Shields**: {sector.shields}\n"
@@ -75,9 +96,9 @@ class LostSectorPostSettings(BasePostSettings, Base):
                 + "• **Modifiers**: {sector.modifiers}\n"
                 + "\n"
                 + "ℹ️ : <https://lostsectortoday.com/>"
-            ),
+            ).format(**format_dict),
             color=cfg.kyber_pink,
-        )
+        ).set_image(ls_gfx_url)
 
     async def get_twitter_data_tuple(self, date: dt.date = None) -> Tuple[str, str]:
         date = date or dt.datetime.now(tz=utc)
@@ -101,10 +122,6 @@ class LostSectorAutopostChannel(BaseChannelRecord, Base):
 
 
 class LostSectorSignal(BaseCustomEvent):
-
-    # Whether bot listen has been called on conditional_reset_repeater
-    _signal_linked: bool = False
-
     @classmethod
     async def conditional_daily_reset_repeater(cls, event: DailyResetSignal) -> None:
         """Dispatched self if autoannounces are enabled in the settings object"""
@@ -122,9 +139,7 @@ class LostSectorSignal(BaseCustomEvent):
     @classmethod
     def register(cls, bot) -> None:
         self = super().register(bot)
-        if not cls._signal_linked:
-            self.app.listen()(cls.conditional_daily_reset_repeater)
-            cls._signal_linked = True
+        self.app.listen()(cls.conditional_daily_reset_repeater)
         return self
 
 
@@ -312,7 +327,6 @@ class LostSectors(AutopostsBase):
                 )
 
     async def announce_to_twitter(self, event):
-        return
         try:
             async with db_session() as session:
                 async with session.begin():
