@@ -208,6 +208,9 @@ class BaseUrlSignal(BaseCustomEvent):
     settings_table: Type[UrlPostSettings]
     trigger_on_signal: h.Event
 
+    # Whether bot listen has been called on conditional_reset_repeater
+    _signal_linked: bool = False
+
     @classmethod
     async def conditional_reset_repeater(cls, event: h.Event) -> None:
         """When awaited, waits for the settings.wait_for_url_update method to return
@@ -232,7 +235,9 @@ class BaseUrlSignal(BaseCustomEvent):
     @classmethod
     def register(cls, bot: lb.BotApp) -> None:
         self = super().register(bot)
-        bot.listen(self.trigger_on_signal)(self.conditional_reset_repeater)
+        if not cls._signal_linked:
+            bot.listen(self.trigger_on_signal)(self.conditional_reset_repeater)
+            cls._signal_linked = True
         return self
 
     @classmethod
