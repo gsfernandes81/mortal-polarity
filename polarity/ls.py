@@ -122,6 +122,9 @@ class LostSectorAutopostChannel(BaseChannelRecord, Base):
 
 
 class LostSectorSignal(BaseCustomEvent):
+    # Whether bot listen has been called on conditional_reset_repeater
+    _signal_linked: bool = False
+
     @classmethod
     async def conditional_daily_reset_repeater(cls, event: DailyResetSignal) -> None:
         """Dispatched self if autoannounces are enabled in the settings object"""
@@ -139,7 +142,9 @@ class LostSectorSignal(BaseCustomEvent):
     @classmethod
     def register(cls, bot) -> None:
         self = super().register(bot)
-        self.app.listen()(cls.conditional_daily_reset_repeater)
+        if not cls._signal_linked:
+            bot.listen()(cls.conditional_daily_reset_repeater)
+            cls._signal_linked = True
         return self
 
 
