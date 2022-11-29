@@ -40,7 +40,7 @@ async def autoupdate_status():
 
     await bot.update_presence(
         activity=h.Activity(
-            name="{} servers : )".format(len(bot.cache.get_guilds_view())),
+            name="{} servers : )".format(len(await bot.rest.fetch_my_guilds())),
             type=h.ActivityType.LISTENING,
         )
     )
