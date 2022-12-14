@@ -135,9 +135,7 @@ class UrlPostSettings(BasePostSettings):
                     return self
                 await asyncio.sleep(check_interval)
 
-    async def get_announce_embed(
-        self, correction: str = "", date: dt.date = None
-    ) -> h.Embed:
+    async def get_announce_embed(self, date: dt.date = None) -> h.Embed:
         await self.update_url()
         # Use the db date if none is specified
         if date is None:
@@ -158,16 +156,12 @@ class UrlPostSettings(BasePostSettings):
             "post_url": post_url,
             "gfx_url": gfx_url,
         }
-        return (
-            h.Embed(
-                title=self.embed_title.format(**format_dict),
-                url=format_dict["post_url"],
-                description=self.embed_description.format(**format_dict),
-                color=cfg.kyber_pink,
-            )
-            .set_image(format_dict["gfx_url"])
-            .set_footer(correction)
-        )
+        return h.Embed(
+            title=self.embed_title.format(**format_dict),
+            url=format_dict["post_url"],
+            description=self.embed_description.format(**format_dict),
+            color=cfg.kyber_pink,
+        ).set_image(format_dict["gfx_url"])
 
     # Note cls is applied partially durign register_embed_user_cmd
     @staticmethod
@@ -352,19 +346,9 @@ class UrlAutopostsBase(AutopostsBase):
                 ],
                 wtf.Command[
                     wtf.Name["update"],
-                    wtf.Description[
-                        "Update a post, optionally with text saying what has changed"
-                    ],
+                    wtf.Description["Update a post"],
                     wtf.AutoDefer[True],
                     wtf.InheritChecks[True],
-                    wtf.Options[
-                        wtf.Option[
-                            wtf.Name["change"],
-                            wtf.Description["What has changed"],
-                            wtf.Type[str],
-                            wtf.Required[False],
-                        ],
-                    ],
                     wtf.Implements[lb.SlashSubCommand],
                     wtf.Executes[self.rectify_announcement],
                 ],
@@ -449,7 +433,6 @@ class UrlAutopostsBase(AutopostsBase):
     async def rectify_announcement(self, ctx: lb.Context):
         """Correct a mistake in the announcement,
         pull from urls again and update existing posts"""
-        change = ctx.options.change if ctx.options.change else ""
         async with db_session() as session:
             async with session.begin():
                 settings: UrlPostSettings = await session.get(self.settings_table, 0)
@@ -474,9 +457,7 @@ class UrlAutopostsBase(AutopostsBase):
             logger.info("Correcting posts")
             with operation_timer("Announce correction", logger):
                 await ctx.respond("Correcting posts now")
-                embed = await settings.get_announce_embed(
-                    change,
-                )
+                embed = await settings.get_announce_embed()
                 no_of_channels = len(channel_record_list)
                 percentage_progress = 0
                 none_counter = 0
