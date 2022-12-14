@@ -171,7 +171,7 @@ class MessageFailureError(Exception):
 
 async def send_message(
     bot: lb.BotApp, channel_id: int, message_kwargs: dict, crosspost: bool = False
-) -> None:
+) -> h.Message:
     try:
         channel = bot.cache.get_guild_channel(
             channel_id
@@ -182,6 +182,8 @@ async def send_message(
             await bot.rest.crosspost_message(channel, message)
     except Exception as e:
         raise MessageFailureError(channel_id, message_kwargs, e)
+    else:
+        return message
 
 
 async def _edit_embedded_message(
