@@ -183,6 +183,15 @@ class BaseChannelRecord:
                 ).format(owner.username, owner.discriminator),
                 components=_component_for_migration(bot),
             )
+        except h.BadRequestError as e:
+            owner = await bot.rest.fetch_user((await bot.fetch_owner_ids())[0])
+            await ctx.respond(
+                "You cannot enable autoposts in an announcement channels "
+                + "or this channel type. please message {}#{} for assistance".format(
+                    owner.username, owner.discriminator
+                ),
+            )
+            logger.exception(e)
         except Exception as e:
             owner = await bot.rest.fetch_user((await bot.fetch_owner_ids())[0])
             await ctx.respond(
