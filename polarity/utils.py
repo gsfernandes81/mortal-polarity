@@ -135,7 +135,7 @@ def _embed_for_migration(original_embed: h.Embed):
 
 def _component_for_migration(bot: lb.BotApp):
     return (
-        bot.rest.build_action_row()
+        bot.rest.build_message_action_row()
         .add_button(h.ButtonStyle.LINK, cfg.migration_invite)
         .set_label("Re-Invite")
         .add_to_container()
