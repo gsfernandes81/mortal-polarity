@@ -217,7 +217,7 @@ async def _edit_embedded_message(
             if not ("This message has already been crossposted" in str(err)):
                 raise err
     except (h.ForbiddenError, h.NotFoundError):
-        logging.warning("Message {} not found or not editable".format(message_id))
+        logger.warning("Message {} not found or not editable".format(message_id))
 
 
 async def _download_linked_image(url: str) -> str:
