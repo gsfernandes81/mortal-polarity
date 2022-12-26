@@ -253,6 +253,7 @@ class BaseChannelRecord:
                                     "embed": _embed_for_migration(embed),
                                     "components": _component_for_migration(event.app),
                                 },
+                                crosspost=True,
                             )
                             for channel_id in channel_id_list
                         ]

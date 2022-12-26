@@ -191,7 +191,6 @@ async def _edit_embedded_message(
     channel_id: int,
     bot: h.GatewayBot,
     embed: h.Embed,
-    announce_if_guild: int = -1,
     logger=logging.getLogger("main/" + __name__),
 ) -> None:
     try:
@@ -211,8 +210,7 @@ async def _edit_embedded_message(
         else:
             await msg.edit(content="", embed=embed, components=None)
         try:
-            if msg.guild_id == announce_if_guild:
-                await bot.rest.crosspost_message(channel_id, msg)
+            await bot.rest.crosspost_message(channel_id, msg)
         except AttributeError:
             pass
         except h.BadRequestError as err:

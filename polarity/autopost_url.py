@@ -472,7 +472,6 @@ class UrlAutopostsBase(AutopostsBase):
                         channel_record.id,
                         ctx.bot,
                         embed,
-                        announce_if_guild=cfg.kyber_discord_server_id,
                         logger=logger,
                     )
 
