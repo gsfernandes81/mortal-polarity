@@ -207,7 +207,6 @@ async def migrate(ctx: lb.Context):
                         forbidden += 1
                     except h.NotFoundError:
                         not_found += 1
-                        channel_record.enabled = False
                     except AttributeError:
                         not_guild += 1
                     except Exception as e:
@@ -245,6 +244,14 @@ async def migrate(ctx: lb.Context):
                             await ctx.edit_last_response(embed=reporting_embed)
 
 
+@lb.add_checks(lb.checks.has_roles(cfg.admin_role))
+@lb.command(
+    name="restore",
+    description="Restore backup ls",
+    guilds=(cfg.control_discord_server_id,),
+    auto_defer=True,
+)
+@lb.implements(lb.SlashCommand)
 def register_all(bot: lb.BotApp) -> None:
     for command in [
         migratability,
