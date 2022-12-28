@@ -198,7 +198,9 @@ async def migrate(ctx: lb.Context):
                             if isinstance(webhook, h.ChannelFollowerWebhook)
                         ]:
                             await bot.rest.follow_channel(follow_channel, channel)
-
+                            channel_record.enabled = False
+                            session.add(channel_record)
+                            migrated += 1
                     except FeatureDisabledError as e:
                         logger.exception(e)
                     except h.BadRequestError:
@@ -212,10 +214,6 @@ async def migrate(ctx: lb.Context):
                     except Exception as e:
                         logger.exception(e)
                         misc_exception += 1
-                    else:
-                        channel_record.enabled = False
-                        session.add(channel_record)
-                        migrated += 1
                     finally:
                         iterations += 1
                         rate = time_till(dt.datetime.now()) / iterations
