@@ -250,6 +250,10 @@ async def migrate(ctx: lb.Context):
     auto_defer=True,
 )
 @lb.implements(lb.SlashCommand)
+def restore():
+    pass
+
+
 def register_all(bot: lb.BotApp) -> None:
     for command in [
         migratability,
