@@ -232,7 +232,6 @@ class BaseChannelRecord:
             )
             with operation_timer("Announce", logger):
                 embed = await settings.get_announce_embed()
-                channel_id_list.remove(cls.follow_channel)
                 exceptions: List[
                     Union[None, MessageFailureError]
                 ] = await asyncio.gather(
@@ -256,6 +255,7 @@ class BaseChannelRecord:
                                 crosspost=True,
                             )
                             for channel_id in channel_id_list
+                            if channel_id != cls.follow_channel
                         ]
                     ),
                     return_exceptions=True
