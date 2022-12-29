@@ -108,6 +108,7 @@ async def migratability(ctx: lb.Context) -> None:
 
 
 @lb.add_checks(lb.checks.has_roles(cfg.admin_role))
+@lb.option("disable_moved", "Disable moved channels", bool, default=False)
 @lb.command(
     name="migrate",
     description="Move to the new system",
@@ -117,6 +118,7 @@ async def migratability(ctx: lb.Context) -> None:
 @lb.implements(lb.SlashCommand)
 async def migrate(ctx: lb.Context):
     bot: lb.BotApp = ctx.bot
+    disable_moved = ctx.options.disable_moved
 
     channel_record_list_all_types = []
     async with db_session() as session:
@@ -198,7 +200,8 @@ async def migrate(ctx: lb.Context):
                             if isinstance(webhook, h.ChannelFollowerWebhook)
                         ]:
                             await bot.rest.follow_channel(follow_channel, channel)
-                            channel_record.enabled = False
+                            if disable_moved:
+                                channel_record.enabled = False
                             session.add(channel_record)
                             migrated += 1
                     except FeatureDisabledError as e:
@@ -240,6 +243,110 @@ async def migrate(ctx: lb.Context):
                                 ),
                             )
                             await ctx.edit_last_response(embed=reporting_embed)
+            await session.commit()
+
+
+@lb.add_checks(lb.checks.has_roles(cfg.admin_role))
+@lb.option("dry_run", "Dry run?", bool, default=True)
+@lb.command(
+    name="disable_moved",
+    description="Remove channels from old system if on new one",
+    guilds=(cfg.control_discord_server_id,),
+    auto_defer=True,
+)
+@lb.implements(lb.SlashCommand)
+async def disable_moved_channels(ctx: lb.Context):
+    bot: lb.BotApp = ctx.bot
+    dry_run = ctx.options.dry_run
+
+    channel_record_list_all_types = []
+    async with db_session() as session:
+        async with session.begin():
+            for follow_channel, channel_table in [
+                (cfg.ls_follow_channel_id, ls.LostSectorAutopostChannel),
+                (cfg.xur_follow_channel_id, xur.XurAutopostChannel),
+                (cfg.reset_follow_channel_id, weekly_reset.WeeklyResetAutopostChannel),
+            ]:
+                channel_record_list = (
+                    await session.execute(
+                        select(channel_table).where(channel_table.enabled == True)
+                    )
+                ).fetchall()
+                channel_record_list = (
+                    [] if channel_record_list is None else channel_record_list
+                )
+                channel_record_list = [channel[0] for channel in channel_record_list]
+                channel_record_list_all_types.extend(channel_record_list)
+
+            disabled = 0
+            iterations = 0
+
+            reporting_embed = (
+                h.Embed(
+                    title="Follow system deduplication",
+                    description="Operation progress / summary",
+                    color=embed_color,
+                )
+                .add_field(
+                    name="Deduped",
+                    value="{} legacy channels disabled\n".format(disabled),
+                )
+                .add_field(
+                    name="Progress",
+                    value="{} / {}".format(
+                        iterations, len(channel_record_list_all_types)
+                    ),
+                )
+            )
+            await ctx.respond(embed=reporting_embed)
+
+            with operation_timer("Migrate") as time_till:
+                for channel_record in channel_record_list_all_types:
+                    try:
+                        channel = bot.cache.get_guild_channel(
+                            channel_record.id
+                        ) or await bot.rest.fetch_channel(channel_record.id)
+
+                        if channel_record.server_id == cfg.kyber_discord_server_id:
+                            continue
+
+                        if follow_channel < 0:
+                            raise FeatureDisabledError(
+                                "Following channels is disabled!"
+                            )
+
+                        if follow_channel in [
+                            webhook.source_channel.id
+                            for webhook in await bot.rest.fetch_channel_webhooks(
+                                channel
+                            )
+                            if isinstance(webhook, h.ChannelFollowerWebhook)
+                        ]:
+                            if not dry_run:
+                                channel_record.enabled = False
+                            session.add(channel_record)
+                            disabled += 1
+                    except Exception as e:
+                        logger.exception(e)
+                    finally:
+                        iterations += 1
+                        rate = time_till(dt.datetime.now()) / iterations
+                        if iterations % round(10 / rate) == 0 or iterations >= len(
+                            channel_record_list_all_types
+                        ):
+                            reporting_embed.edit_field(
+                                0,
+                                h.UNDEFINED,
+                                "{} legacy channels disabled\n".format(disabled),
+                            ).edit_field(
+                                1,
+                                h.UNDEFINED,
+                                "{} / {}".format(
+                                    iterations, len(channel_record_list_all_types)
+                                ),
+                            )
+                            await ctx.edit_last_response(embed=reporting_embed)
+                        await session.commit()
 
 
 @lb.add_checks(lb.checks.has_roles(cfg.admin_role))
@@ -258,5 +365,6 @@ def register_all(bot: lb.BotApp) -> None:
     for command in [
         migratability,
         migrate,
+        disable_moved_channels,
     ]:
         bot.command(command)
