@@ -355,6 +355,7 @@ class WeekendResetSignal(ResetSignal):
 @lb.add_checks(
     custom_checks.has_guild_permissions(h.Permissions.MANAGE_WEBHOOKS)
     | custom_checks.has_guild_permissions(h.Permissions.ADMINISTRATOR)
+    | lb.checks.owner_only
 )
 @lb.command(
     "autopost", "Server autopost management, can be used by server administrators only"
