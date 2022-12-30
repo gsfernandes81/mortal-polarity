@@ -60,7 +60,7 @@ control_discord_server_id = (
 migration_deadline = str(_getenv("MIGRATION_DEADLINE"))
 migration_help = str(_getenv("MIGRATION_HELP"))
 migration_invite = str(_getenv("MIGRATION_INVITE"))
-disable_bad_channels = bool(_getenv("DISABLE_BAD_CHANNELS"))
+disable_bad_channels = _getenv("DISABLE_BAD_CHANNELS").lower() == "true"
 
 ls_follow_channel_id = int(_getenv("LS_FOLLOW_CHANNEL_ID"))
 xur_follow_channel_id = int(_getenv("XUR_FOLLOW_CHANNEL_ID"))
