@@ -179,7 +179,13 @@ async def send_message(
 
         message = await channel.send(**message_kwargs)
         if crosspost:
-            await bot.rest.crosspost_message(channel, message)
+            try:
+                await bot.rest.crosspost_message(channel, message)
+            except h.ForbiddenError:
+                # Crosspost if possible
+                # Ignore if not since we want the
+                # message to be returned still
+                pass
     except Exception as e:
         raise MessageFailureError(channel_id, message_kwargs, e)
     else:
