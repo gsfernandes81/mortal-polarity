@@ -178,7 +178,7 @@ async def send_message(
         ) or await bot.rest.fetch_channel(channel_id)
 
         message = await channel.send(**message_kwargs)
-        if crosspost:
+        if crosspost and isinstance(channel, h.GuildNewsChannel):
             try:
                 await bot.rest.crosspost_message(channel, message)
             except h.ForbiddenError:
