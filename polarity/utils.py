@@ -156,6 +156,8 @@ async def _bot_has_webhook_perms(
         channel = None
     if not channel:
         channel = await bot.rest.fetch_channel(channel_id)
+    if not isinstance(channel, h.GuildChannel):
+        return False
     bot_member = await bot.rest.fetch_member(channel.guild_id, bot.get_me())
     return h.Permissions.MANAGE_WEBHOOKS in toolbox.calculate_permissions(
         bot_member, channel
@@ -215,13 +217,6 @@ async def _edit_embedded_message(
             )
         else:
             await msg.edit(content="", embed=embed, components=None)
-        try:
-            await bot.rest.crosspost_message(channel_id, msg)
-        except AttributeError:
-            pass
-        except h.BadRequestError as err:
-            if not ("This message has already been crossposted" in str(err)):
-                raise err
     except (h.ForbiddenError, h.NotFoundError):
         logger.warning("Message {} not found or not editable".format(message_id))
 
