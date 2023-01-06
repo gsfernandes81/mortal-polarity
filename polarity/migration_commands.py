@@ -346,7 +346,8 @@ async def disable_moved_channels(ctx: lb.Context):
                                 ),
                             )
                             await ctx.edit_last_response(embed=reporting_embed)
-                        await session.commit()
+                # Commit changes to db after all channels have been iterated through
+                await session.commit()
 
 
 @lb.add_checks(lb.checks.has_roles(cfg.admin_role))
