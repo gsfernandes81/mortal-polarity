@@ -248,10 +248,7 @@ class BaseChannelRecord:
                             send_message(
                                 event.app,
                                 channel_id,
-                                message_kwargs={
-                                    "embed": _embed_for_migration(embed),
-                                    "components": _component_for_migration(event.app),
-                                },
+                                message_kwargs={"embed": embed},
                                 crosspost=True,
                             )
                             for channel_id in channel_id_list

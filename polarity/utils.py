@@ -206,17 +206,7 @@ async def _edit_embedded_message(
             message_id
         ) or await bot.rest.fetch_message(channel_id, message_id)
 
-        if (
-            msg.guild_id != cfg.kyber_discord_server_id
-            and not await _bot_has_webhook_perms(bot, channel_id)
-        ):
-            await msg.edit(
-                content="",
-                embed=_embed_for_migration(embed),
-                components=_component_for_migration(bot),
-            )
-        else:
-            await msg.edit(content="", embed=embed, components=None)
+        await msg.edit(content="", embed=embed, components=None)
     except (h.ForbiddenError, h.NotFoundError):
         logger.warning("Message {} not found or not editable".format(message_id))
 
