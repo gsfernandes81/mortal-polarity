@@ -143,13 +143,19 @@ class BaseChannelRecord:
 
         try:
             if option:
-                # Fetch all follow based webhooks that have our channel as a source
-                follow_webhooks = [
-                    hook
-                    for hook in await bot.rest.fetch_channel_webhooks(channel_id)
-                    if isinstance(hook, h.ChannelFollowerWebhook)
-                    and hook.source_channel.id == cls.follow_channel
-                ]
+                try:
+                    # Fetch all follow based webhooks that have our channel as a source
+                    follow_webhooks = [
+                        hook
+                        for hook in await bot.rest.fetch_channel_webhooks(channel_id)
+                        if isinstance(hook, h.ChannelFollowerWebhook)
+                        and hook.source_channel.id == cls.follow_channel
+                    ]
+                except KeyError:
+                    # For some webhook types the source channel parameter does not
+                    # deserialise on hikari's end correctly
+                    follow_webhooks = []
+
                 if len(follow_webhooks) == 0:
                     await bot.rest.follow_channel(cls.follow_channel, channel_id)
                     await ctx.respond("{} enabled".format(cls.autopost_friendly_name))
@@ -158,13 +164,19 @@ class BaseChannelRecord:
                         "{} were already enabled".format(cls.autopost_friendly_name)
                     )
             else:
-                # Fetch all follow based webhooks that have our channel as a source
-                follow_webhooks = [
-                    hook
-                    for hook in await bot.rest.fetch_channel_webhooks(channel_id)
-                    if isinstance(hook, h.ChannelFollowerWebhook)
-                    and hook.source_channel.id == cls.follow_channel
-                ]
+                try:
+                    # Fetch all follow based webhooks that have our channel as a source
+                    follow_webhooks = [
+                        hook
+                        for hook in await bot.rest.fetch_channel_webhooks(channel_id)
+                        if isinstance(hook, h.ChannelFollowerWebhook)
+                        and hook.source_channel.id == cls.follow_channel
+                    ]
+                except KeyError:
+                    # For some webhook types the source channel parameter does not
+                    # deserialise on hikari's end correctly
+                    follow_webhooks = []
+
                 if len(follow_webhooks) == 0:
                     await ctx.respond(
                         "{} were already disabled.".format(cls.autopost_friendly_name)
