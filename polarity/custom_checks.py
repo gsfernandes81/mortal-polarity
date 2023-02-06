@@ -14,6 +14,7 @@
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
 import functools
+import logging
 import operator
 
 import hikari as h
@@ -21,6 +22,8 @@ from lightbulb import context as context_
 from lightbulb import errors
 from lightbulb.checks import Check, _guild_only
 from lightbulb.utils import permissions
+
+logger = logging.getLogger(__name__)
 
 
 async def _has_guild_permissions(
@@ -34,13 +37,18 @@ async def _has_guild_permissions(
             context.channel_id
         ) or await context.bot.rest.fetch_channel(context.channel_id)
 
-    assert context.member is not None and isinstance(channel, h.GuildChannel)
+    if not (context.member is not None and isinstance(channel, h.GuildChannel)):
+        return False
+
     missing_perms = ~permissions.permissions_in(channel, context.member) & perms
     if missing_perms is not h.Permissions.NONE:
-        raise errors.MissingRequiredPermission(
+        exc = errors.MissingRequiredPermission(
             "You are missing one or more permissions required in order to run this command",
             perms=missing_perms,
         )
+        logger.exception(exc)
+        raise exc
+
     return True
 
 
