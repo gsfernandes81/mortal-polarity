@@ -142,12 +142,25 @@ class BaseChannelRecord:
         bot = ctx.bot
 
         try:
+            # Only fetch channel as opposed to getting it from cache
+            # since we want to make sure the bot can see the channel
+            # when following it
+            channel = await bot.rest.fetch_channel(channel_id)
+        except h.ForbiddenError:
+            await ctx.respond(
+                'The bot does not have the "View Channel" permission here. '
+                + "Please allow the bot to see this channel to enable "
+                + "autoposts here"
+            )
+            return
+
+        try:
             if option:
                 try:
                     # Fetch all follow based webhooks that have our channel as a source
                     follow_webhooks = [
                         hook
-                        for hook in await bot.rest.fetch_channel_webhooks(channel_id)
+                        for hook in await bot.rest.fetch_channel_webhooks(channel)
                         if isinstance(hook, h.ChannelFollowerWebhook)
                         and hook.source_channel.id == cls.follow_channel
                     ]
@@ -157,7 +170,7 @@ class BaseChannelRecord:
                     follow_webhooks = []
 
                 if len(follow_webhooks) == 0:
-                    await bot.rest.follow_channel(cls.follow_channel, channel_id)
+                    await bot.rest.follow_channel(cls.follow_channel, channel)
                     await ctx.respond("{} enabled".format(cls.autopost_friendly_name))
                 else:
                     await ctx.respond(
@@ -168,7 +181,7 @@ class BaseChannelRecord:
                     # Fetch all follow based webhooks that have our channel as a source
                     follow_webhooks = [
                         hook
-                        for hook in await bot.rest.fetch_channel_webhooks(channel_id)
+                        for hook in await bot.rest.fetch_channel_webhooks(channel)
                         if isinstance(hook, h.ChannelFollowerWebhook)
                         and hook.source_channel.id == cls.follow_channel
                     ]
@@ -214,7 +227,7 @@ class BaseChannelRecord:
             logger.exception(e)
             await alert_owner(
                 "An autopost follow command for\nchannel id:",
-                channel_id,
+                channel,
                 "\nserver id:",
                 server_id,
                 "\nhas failed with exception:",
