@@ -26,6 +26,7 @@ from lightbulb.ext import wtf
 from pytz import utc
 from sector_accounting import Rotation
 from sqlalchemy import select
+import aiohttp
 
 from . import cfg
 from .autopost import (
@@ -58,7 +59,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
         + "• Reward (If-Solo): {sector.reward}\n"
         + "• Champs: {sector.champions}\n"
         + "• Shields: {sector.shields}\n"
-        + "• Burn: {sector.burn}\n"
+        + "• Threat: {sector.burn}\n"
         + "• Modifiers: {sector.modifiers}\n\n"
         + "ℹ️ : https://lostsectortoday.com/"
     )
@@ -74,7 +75,10 @@ class LostSectorPostSettings(BasePostSettings, Base):
         )()
 
         # Follow the hyperlink to have the newest image embedded
-        ls_gfx_url = await follow_link_single_step(rot.shortlink_gfx)
+        try:
+            ls_gfx_url = await follow_link_single_step(rot.shortlink_gfx)
+        except aiohttp.InvalidURL:
+            ls_gfx_url = None
 
         format_dict = {
             "month": month[date.month],
@@ -83,7 +87,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
             "ls_url": ls_gfx_url,
         }
 
-        return h.Embed(
+        embed = h.Embed(
             title="**Lost Sector Today**".format(**format_dict),
             description=(
                 "⠀\n<:LS:849727805994565662> **{sector.name}\n\n".format(
@@ -98,7 +102,12 @@ class LostSectorPostSettings(BasePostSettings, Base):
                 + "ℹ️ : <https://lostsectortoday.com/>"
             ).format(**format_dict),
             color=cfg.kyber_pink,
-        ).set_image(ls_gfx_url)
+        )
+
+        if ls_gfx_url:
+            embed.set_image(ls_gfx_url)
+
+        return embed
 
     async def get_twitter_data_tuple(self, date: dt.date = None) -> Tuple[str, str]:
         date = date or dt.datetime.now(tz=utc)
@@ -308,7 +317,6 @@ class LostSectors(AutopostsBase):
                 none_counter = 0
 
                 for idx, channel_record in enumerate(channel_record_list):
-
                     if channel_record.last_msg_id is None:
                         none_counter += 1
                         continue
