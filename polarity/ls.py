@@ -96,7 +96,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
                 + "• **Reward (If-Solo)**: {sector.reward}\n"
                 + "• **Champs**: {sector.champions}\n"
                 + "• **Shields**: {sector.shields}\n"
-                + "• **Burn**: {sector.burn}\n"
+                + "• **Threat**: {sector.burn}\n"
                 + "• **Modifiers**: {sector.modifiers}\n"
                 + "\n"
                 + "ℹ️ : <https://lostsectortoday.com/>"

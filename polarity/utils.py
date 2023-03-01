@@ -211,7 +211,7 @@ async def _edit_embedded_message(
         logger.warning("Message {} not found or not editable".format(message_id))
 
 
-async def _download_linked_image(url: str) -> str:
+async def _download_linked_image(url: str) -> Union[str, None]:
     # Returns the name of the downloaded image
     # Throws an aiohttp.client_exceptions.InvalidURL on
     # an invalid url
@@ -220,17 +220,20 @@ async def _download_linked_image(url: str) -> str:
     #       And implement a name size limit as required
     async with aiohttp.ClientSession() as session:
         backoff_timer = 1
-        while True:
-            async with session.get(url) as resp:
-                if resp.status == 200:
-                    name = _get_uri_name(resp.url)
-                    f = await aiofiles.open(name, mode="wb")
-                    await f.write(await resp.read())
-                    await f.close()
-                    return name
-                else:
-                    await asyncio.sleep(backoff_timer)
-                    backoff_timer = backoff_timer + (1 / backoff_timer)
+        try:
+            while True:
+                async with session.get(url) as resp:
+                    if resp.status == 200:
+                        name = _get_uri_name(resp.url)
+                        f = await aiofiles.open(name, mode="wb")
+                        await f.write(await resp.read())
+                        await f.close()
+                        return name
+                    else:
+                        await asyncio.sleep(backoff_timer)
+                        backoff_timer = backoff_timer + (1 / backoff_timer)
+        except aiohttp.InvalidURL:
+            return None
 
 
 def _get_uri_name(url: str) -> str:
