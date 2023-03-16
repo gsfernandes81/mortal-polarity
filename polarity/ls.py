@@ -15,10 +15,12 @@
 
 import asyncio
 import datetime as dt
+import functools
 import logging
 from calendar import month_name as month
 from typing import List, Tuple, Type
 
+import aiohttp
 import hikari as h
 import lightbulb as lb
 import tweepy
@@ -26,7 +28,6 @@ from lightbulb.ext import wtf
 from pytz import utc
 from sector_accounting import Rotation
 from sqlalchemy import select
-import aiohttp
 
 from . import cfg
 from .autopost import (
@@ -39,15 +40,14 @@ from .autopost import (
 from .utils import (
     Base,
     _create_or_get,
-    alert_owner,
     _download_linked_image,
     _edit_embedded_message,
     _run_in_thread_pool,
+    alert_owner,
     db_session,
     follow_link_single_step,
     operation_timer,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +128,48 @@ class LostSectorAutopostChannel(BaseChannelRecord, Base):
     settings_records: Type[BasePostSettings] = LostSectorPostSettings
     follow_channel = cfg.ls_follow_channel_id
     autopost_friendly_name = "Lost sector autoposts"
+
+    @classmethod
+    def register(
+        cls,
+        bot: lb.BotApp,
+        cmd_group: lb.SlashCommandGroup,
+        announce_event: Type[h.Event],
+    ):
+        cls.control_command_name = "lost sector"
+
+        @cmd_group.child
+        @lb.app_command_permissions(dm_enabled=False)
+        @lb.command("lost", "Lost sector autoposts", inherit_checks=True)
+        @lb.implements(lb.SlashSubGroup)
+        async def lost(ctx: lb.Context) -> None:
+            pass
+
+        lost.child(
+            lb.app_command_permissions(dm_enabled=False)(
+                lb.option(
+                    "option",
+                    "Enabled or disabled",
+                    type=str,
+                    choices=["Enable", "Disable"],
+                    required=True,
+                )(
+                    lb.command(
+                        "sector",
+                        "{} auto posts".format(cls.control_command_name.capitalize()),
+                        auto_defer=True,
+                        guilds=cfg.control_discord_server_id,
+                        inherit_checks=True,
+                    )(
+                        lb.implements(lb.SlashSubCommand)(
+                            functools.partial(cls.autopost_ctrl_usr_cmd, cls)
+                        )
+                    )
+                )
+            )
+        )
+
+        bot.listen(announce_event)(cls.announcer)
 
 
 class LostSectorSignal(BaseCustomEvent):
