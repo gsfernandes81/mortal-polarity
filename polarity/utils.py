@@ -284,3 +284,8 @@ async def alert_owner(
 
     # Send the alert in the channel
     await channel.send(alert, role_mentions=True)
+
+
+def endl(*args: List[str]) -> str:
+    # Returns a string with each argument separated by a newline
+    return "\n".join([str(arg) for arg in args])

@@ -13,7 +13,6 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio
 import datetime as dt
 import functools
 import logging
@@ -45,6 +44,7 @@ from .utils import (
     _run_in_thread_pool,
     alert_owner,
     db_session,
+    endl,
     follow_link_single_step,
     operation_timer,
 )
@@ -53,16 +53,30 @@ logger = logging.getLogger(__name__)
 
 
 class LostSectorPostSettings(BasePostSettings, Base):
-    twitter_ls_post_string = (
-        "Lost Sector Today\n\n"
-        + "💠 {sector.name}\n\n"
-        + "• Reward (If-Solo): {sector.reward}\n"
-        + "• Champs: {sector.champions}\n"
-        + "• Shields: {sector.shields}\n"
-        + "• Threat: {sector.burn}\n"
-        + "• Modifiers: {sector.modifiers}\n\n"
-        + "ℹ️ : https://lostsectortoday.com/"
+    twitter_ls_post_string = endl(
+        "Lost Sector Today",
+        "",
+        "🗺️ {sector.name}",
+        "🏆 Exotic {sector.reward}",
+        "",
+        "👹 {sector.champions}",
+        "🛡️ {sector.shields}",
+        "☢️ {sector.burn} Threat",
+        "{weapon_emoji} {sector.overcharged_weapon} Overcharge",
+        "💪 {sector.surge} Surge",
+        "🛠️ {sector.modifiers}",
+        "",
+        "🔗 lostsectortoday.com",
     )
+
+    @classmethod
+    def format_twitter_post(cls, sector):
+        weapon_emoji = (
+            "⚔️" if sector.overcharged_weapon.lower() in ["sword", "glaive"] else "🔫"
+        )
+        return cls.twitter_ls_post_string.format(
+            sector=sector, weapon_emoji=weapon_emoji
+        )
 
     async def get_announce_embed(self, date: dt.date = None) -> h.Embed:
         buffer = 1  # Minute
@@ -89,17 +103,21 @@ class LostSectorPostSettings(BasePostSettings, Base):
 
         embed = h.Embed(
             title="**Lost Sector Today**".format(**format_dict),
-            description=(
-                "⠀\n<:LS:849727805994565662> **{sector.name}\n\n".format(
+            description=endl(
+                "⠀",
+                "<:LS:849727805994565662> **{sector.name}".format(
                     **format_dict
-                ).replace(" (", "** (", 1)
-                + "• **Reward (If-Solo)**: {sector.reward}\n"
-                + "• **Champs**: {sector.champions}\n"
-                + "• **Shields**: {sector.shields}\n"
-                + "• **Threat**: {sector.burn}\n"
-                + "• **Modifiers**: {sector.modifiers}\n"
-                + "\n"
-                + "ℹ️ : <https://lostsectortoday.com/>"
+                ).replace(" (", "** (", 1),
+                "",
+                "• **Reward (If-Solo)**: {sector.reward}",
+                "• **Champs**: {sector.champions}",
+                "• **Shields**: {sector.shields}",
+                "• **Threat**: {sector.burn}",
+                "• **Overcharged Weapon**: {sector.overcharged_weapon}",
+                "• **Surge**: {sector.surge}",
+                "• **Modifiers**: {sector.modifiers}",
+                "",
+                "ℹ️ : <https://lostsectortoday.com/>",
             ).format(**format_dict),
             color=cfg.kyber_pink,
         )
@@ -115,11 +133,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
             cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=1  # minutes
         )()
         return (
-            self.twitter_ls_post_string.format(
-                sector=rot,
-                month=month[date.month],
-                day=date.day,
-            ),
+            self.format_twitter_post(rot),
             await _download_linked_image(rot.shortlink_gfx),
         )
 
