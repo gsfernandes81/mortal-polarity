@@ -16,14 +16,16 @@
 import datetime as dt
 import functools
 import logging
+from asyncio import sleep
 from calendar import month_name as month
 from typing import List, Tuple, Type
+from random import randint
 
 import aiohttp
 import hikari as h
 import lightbulb as lb
 import tweepy
-from lightbulb.ext import wtf
+from lightbulb.ext import tasks, wtf
 from pytz import utc
 from sector_accounting import Rotation, Sector
 from sector_accounting.sector_accounting import DifficultySpecificSectorData
@@ -65,6 +67,29 @@ UNSTOPPABLE_EMOJI = "<:unstoppable_k:1042280867269201951>"
 SWORDS_EMOJI = "<:swords:849729529076514866>"
 LOCATION_EMOJI = "<:location:1086525796031676556>"
 EXOTIC_ENGRAM_EMOJI = "<:exotic_engram:849898122083434506>"
+
+
+ROTATION_UPDATE_INTERVAL = 60
+
+rotation_global = None
+
+
+@tasks.task(
+    s=ROTATION_UPDATE_INTERVAL,
+    auto_start=True,
+    wait_before_execution=False,
+)
+async def rotation_update_task():
+    global rotation_global
+    try:
+        # Introduce a 5% jitter to the update interval
+        # to avoid potential ratelimit issues
+        await sleep(randint(0, int(ROTATION_UPDATE_INTERVAL / 20)))
+        rotation_global = Rotation.from_gspread_url(
+            cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=5
+        )
+    except Exception as e:
+        logging.error(e)
 
 
 def _fmt_count(emoji: str, count: int, width: int) -> str:
@@ -189,9 +214,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
             date = dt.datetime.now(tz=utc) - dt.timedelta(hours=16, minutes=60 - buffer)
         else:
             date = date + dt.timedelta(minutes=buffer)
-        sector: Sector = Rotation.from_gspread_url(
-            cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=buffer
-        )()
+        sector: Sector = rotation_global()
 
         # Follow the hyperlink to have the newest image embedded
         try:
