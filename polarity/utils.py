@@ -289,3 +289,16 @@ async def alert_owner(
 def endl(*args: List[str]) -> str:
     # Returns a string with each argument separated by a newline
     return "\n".join([str(arg) for arg in args])
+
+
+class space:
+    zero_width = "\u200b"
+    hair = "\u200a"
+    six_per_em = "\u2006"
+    thin = "\u2009"
+    punctuation = "\u2008"
+    four_per_em = "\u2005"
+    three_per_em = "\u2004"
+    figure = "\u2007"
+    en = "\u2002"
+    em = "\u2003"

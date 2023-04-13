@@ -25,7 +25,8 @@ import lightbulb as lb
 import tweepy
 from lightbulb.ext import wtf
 from pytz import utc
-from sector_accounting import Rotation
+from sector_accounting import Rotation, Sector
+from sector_accounting.sector_accounting import DifficultySpecificSectorData
 from sqlalchemy import select
 
 from . import cfg
@@ -47,9 +48,113 @@ from .utils import (
     endl,
     follow_link_single_step,
     operation_timer,
+    space,
 )
 
 logger = logging.getLogger(__name__)
+
+LS_EMOJI = "<:LS:849727805994565662>"
+SOLAR_EMOJI = "<:solar:849726154540974183>"
+ARC_EMOJI = "<:arc:849725765063016508>"
+VOID_EMOJI = "<:void:849726137181405204>"
+STASIS_EMOJI = "<:stasis:1092891643490873384>"
+STRAND_EMOJI = "<:strand:1092891834252013609> "
+BARRIER_EMOJI = "<:barrier:1074985839253258321>"
+OVERLOAD_EMOJI = "<:overload_k:1042280801309569105>"
+UNSTOPPABLE_EMOJI = "<:unstoppable_k:1042280867269201951>"
+SWORDS_EMOJI = "<:swords:849729529076514866>"
+LOCATION_EMOJI = "<:location:1086525796031676556>"
+EXOTIC_ENGRAM_EMOJI = "<:exotic_engram:849898122083434506>"
+
+
+def _fmt_count(emoji: str, count: int, width: int) -> str:
+    if count:
+        return "{} x `{}`".format(
+            emoji,
+            str(count).rjust(width, " "),
+        )
+    else:
+        return ""
+
+
+def format_sector_data_for_discord(
+    legend_data: DifficultySpecificSectorData, master_data: DifficultySpecificSectorData
+) -> str:
+    len_bar = len(
+        str(max(legend_data.barrier_champions, master_data.barrier_champions, key=abs))
+    )
+    len_oload = len(
+        str(
+            max(legend_data.overload_champions, master_data.overload_champions, key=abs)
+        )
+    )
+    len_unstop = len(
+        str(
+            max(
+                legend_data.unstoppable_champions,
+                master_data.unstoppable_champions,
+                key=abs,
+            )
+        )
+    )
+    len_arc = len(str(max(legend_data.arc_shields, master_data.arc_shields, key=abs)))
+    len_void = len(
+        str(max(legend_data.void_shields, master_data.void_shields, key=abs))
+    )
+    len_solar = len(
+        str(max(legend_data.solar_shields, master_data.solar_shields, key=abs))
+    )
+    len_stasis = len(
+        str(max(legend_data.stasis_shields, master_data.stasis_shields, key=abs))
+    )
+    len_strand = len(
+        str(max(legend_data.strand_shields, master_data.strand_shields, key=abs))
+    )
+
+    data_strings = []
+
+    for data in [legend_data, master_data]:
+        champs_string = space.em.join(
+            filter(
+                None,
+                [
+                    _fmt_count(BARRIER_EMOJI, data.barrier_champions, len_bar),
+                    _fmt_count(OVERLOAD_EMOJI, data.overload_champions, len_oload),
+                    _fmt_count(
+                        UNSTOPPABLE_EMOJI, data.unstoppable_champions, len_unstop
+                    ),
+                ],
+            )
+        )
+        shields_string = space.em.join(
+            filter(
+                None,
+                [
+                    _fmt_count(ARC_EMOJI, data.arc_shields, len_arc),
+                    _fmt_count(VOID_EMOJI, data.void_shields, len_void),
+                    _fmt_count(SOLAR_EMOJI, data.solar_shields, len_solar),
+                    _fmt_count(STASIS_EMOJI, data.stasis_shields, len_stasis),
+                    _fmt_count(STRAND_EMOJI, data.strand_shields, len_strand),
+                ],
+            )
+        )
+        data_string = f"{space.em}|{space.em}".join(
+            filter(
+                None,
+                [
+                    champs_string,
+                    shields_string,
+                ],
+            )
+        )
+        data_strings.append(data_string)
+
+    return (
+        f"Legend:{space.figure}"
+        + data_strings[0]
+        + f"\nMaster:{space.hair}{space.figure}"
+        + data_strings[1]
+    )
 
 
 class LostSectorPostSettings(BasePostSettings, Base):
@@ -70,7 +175,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
     )
 
     @classmethod
-    def format_twitter_post(cls, sector):
+    def format_twitter_post(cls, sector: Sector):
         weapon_emoji = (
             "⚔️" if sector.overcharged_weapon.lower() in ["sword", "glaive"] else "🔫"
         )
@@ -84,42 +189,90 @@ class LostSectorPostSettings(BasePostSettings, Base):
             date = dt.datetime.now(tz=utc) - dt.timedelta(hours=16, minutes=60 - buffer)
         else:
             date = date + dt.timedelta(minutes=buffer)
-        rot = Rotation.from_gspread_url(
+        sector: Sector = Rotation.from_gspread_url(
             cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=buffer
         )()
 
         # Follow the hyperlink to have the newest image embedded
         try:
-            ls_gfx_url = await follow_link_single_step(rot.shortlink_gfx)
+            ls_gfx_url = await follow_link_single_step(sector.shortlink_gfx)
         except aiohttp.InvalidURL:
             ls_gfx_url = None
 
-        format_dict = {
-            "month": month[date.month],
-            "day": date.day,
-            "sector": rot,
-            "ls_url": ls_gfx_url,
-        }
+        # Surges to emojis
+        _surges = [surge.lower() for surge in sector.surges]
+        surges = []
+        if "solar" in _surges:
+            surges += [SOLAR_EMOJI]
+        if "arc" in _surges:
+            surges += [ARC_EMOJI]
+        if "void" in _surges:
+            surges += [VOID_EMOJI]
+        if "stasis" in _surges:
+            surges += [STASIS_EMOJI]
+        if "strand" in _surges:
+            surges += [STRAND_EMOJI]
 
-        embed = h.Embed(
-            title="**Lost Sector Today**".format(**format_dict),
-            description=endl(
-                "⠀",
-                "<:LS:849727805994565662> **{sector.name}".format(
-                    **format_dict
-                ).replace(" (", "** (", 1),
-                "",
-                "• **Reward (If-Solo)**: {sector.reward}",
-                "• **Champs**: {sector.champions}",
-                "• **Shields**: {sector.shields}",
-                "• **Threat**: {sector.burn}",
-                "• **Overcharged Weapon**: {sector.overcharged_weapon}",
-                "• **Surge**: {sector.surge}",
-                "• **Modifiers**: {sector.modifiers}",
-                "",
-                "ℹ️ : <https://lostsectortoday.com/>",
-            ).format(**format_dict),
-            color=cfg.kyber_pink,
+        # Threat to emoji
+        threat = sector.threat.lower()
+        if threat == "solar":
+            threat = SOLAR_EMOJI
+        elif threat == "arc":
+            threat = ARC_EMOJI
+        elif threat == "void":
+            threat = VOID_EMOJI
+        elif threat == "stasis":
+            threat = STASIS_EMOJI
+        elif threat == "strand":
+            threat = STRAND_EMOJI
+
+        overcharged_weapon_emoji = (
+            "⚔️" if sector.overcharged_weapon.lower() in ["sword", "glaive"] else "🔫"
+        )
+
+        if "(" in sector.name or ")" in sector.name:
+            sector_name = sector.name.split("(")[0].strip()
+            sector_location = sector.name.split("(")[1].split(")")[0].strip()
+        else:
+            sector_name = sector.name
+            sector_location = None
+
+        embed = (
+            h.Embed(
+                title="**Lost Sector Today**",
+                description=(
+                    f"{LS_EMOJI}{space.three_per_em}{sector_name}\n"
+                    + (
+                        f"{LOCATION_EMOJI}{space.three_per_em}{sector_location}\n"
+                        if sector_location
+                        else ""
+                    )
+                    + f"\n"
+                ),
+                color=cfg.kyber_pink,
+                url="https://lostsectortoday.com/",
+            )
+            .add_field(
+                name=f"Reward",
+                value=f"{EXOTIC_ENGRAM_EMOJI}{space.three_per_em}Exotic {sector.reward} (If-Solo)",
+            )
+            .add_field(
+                name=f"Champs or Shields",
+                value=format_sector_data_for_discord(
+                    sector.legend_data, sector.master_data
+                ),
+            )
+            .add_field(
+                name=f"Elementals",
+                value=f"Surge: {space.punctuation}{space.hair}{space.hair}"
+                + " ".join(surges)
+                + f"\nThreat: {threat}",
+            )
+            .add_field(
+                name=f"Modifiers",
+                value=f"{SWORDS_EMOJI}{space.three_per_em}{sector.to_sector_v1().modifiers}"
+                + f"\n{overcharged_weapon_emoji}{space.three_per_em}Overcharged {sector.overcharged_weapon}",
+            )
         )
 
         if ls_gfx_url:
@@ -131,7 +284,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
         date = date or dt.datetime.now(tz=utc)
         rot = Rotation.from_gspread_url(
             cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=1  # minutes
-        )()
+        )().to_sector_v1()
         return (
             self.format_twitter_post(rot),
             await _download_linked_image(rot.shortlink_gfx),
@@ -421,7 +574,7 @@ class LostSectors(AutopostsBase):
                 "Lost sector post Tweet length more than 280 characters, not posting"
             )
         # If we have a lost sector graphic, the file name will not be none
-        # and we can upload this graphic to twitter and use it
+        # or we can upload this graphic to twitter or use it
         if attachment_file_name != None:
             # Upload the lost sector image
             media_id = int(
