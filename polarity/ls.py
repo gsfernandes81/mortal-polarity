@@ -71,7 +71,7 @@ def _fmt_count(emoji: str, count: int, width: int) -> str:
     if count:
         return "{} x `{}`".format(
             emoji,
-            str(count).rjust(width, " "),
+            str(count if count != -1 else "?").rjust(width, " "),
         )
     else:
         return ""
