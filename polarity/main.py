@@ -32,18 +32,31 @@ bot: lb.BotApp = lb.BotApp(**cfg.lightbulb_params)
 logger = logging.getLogger(__name__)
 
 
-@tasks.task(m=30, auto_start=True, wait_before_execution=False)
-async def autoupdate_status():
-    if not bot.d.has_lb_started:
-        await bot.wait_for(lb.events.LightbulbStartedEvent, timeout=None)
-        bot.d.has_lightbulb_started = True
-
+async def update_status(guild_count: int):
     await bot.update_presence(
         activity=h.Activity(
-            name="{} servers : )".format(len(await bot.rest.fetch_my_guilds())),
+            name="{} servers : )".format(guild_count),
             type=h.ActivityType.LISTENING,
         )
     )
+
+
+@bot.listen()
+async def on_start(event: lb.events.LightbulbStartedEvent):
+    bot.d.guild_count = len(await bot.rest.fetch_my_guilds())
+    await update_status(bot.d.guild_count)
+
+
+@bot.listen()
+async def on_guild_add(event: h.events.GuildJoinEvent):
+    bot.d.guild_count += 1
+    await update_status(bot.d.guild_count)
+
+
+@bot.listen()
+async def on_guild_rm(event: h.events.GuildLeaveEvent):
+    bot.d.guild_count -= 1
+    await update_status(bot.d.guild_count)
 
 
 if __name__ == "__main__":
