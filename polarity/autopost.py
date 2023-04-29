@@ -284,15 +284,17 @@ class BaseChannelRecord:
                 )
 
                 for e in exceptions:
-                    if e is not None:
+                    if isinstance(e, h.Message):
+                        msg: h.Message = e
+                        channel_record.last_msg_id = msg.id
+                        continue
+                    if isinstance(e, MessageFailureError):
                         channel_record = await session.get(cls, e.channel_id)
-                        if isinstance(e, Exception):
-                            if cfg.disable_bad_channels:
-                                channel_record.enabled = False
-                            logger.exception(e)
-                        elif isinstance(e, h.Message):
-                            msg: h.Message = e
-                            channel_record.last_msg_id = msg.id
+                        if cfg.disable_bad_channels:
+                            channel_record.enabled = False
+                        logger.exception(e)
+                    if isinstance(e, BaseException):
+                        logger.exception(e)
                 await session.commit()
 
 
