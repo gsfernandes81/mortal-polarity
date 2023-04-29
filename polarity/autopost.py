@@ -239,6 +239,10 @@ class BaseChannelRecord:
 
     @classmethod
     async def announcer(cls, event):
+        await cls._announcer(event)
+
+    @classmethod
+    async def _announcer(cls, event, **kwargs):
         async with db_session() as session:
             async with session.begin():
                 settings: BasePostSettings = await session.get(cls.settings_records, 0)
@@ -256,7 +260,7 @@ class BaseChannelRecord:
                 "Announcing posts to {} channels".format(len(channel_id_list))
             )
             with operation_timer("Announce", logger):
-                embed = await settings.get_announce_embed()
+                embed = await settings.get_announce_embed(**kwargs)
                 exceptions: List[
                     Union[None, MessageFailureError]
                 ] = await asyncio.gather(
