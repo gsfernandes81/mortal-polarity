@@ -293,10 +293,10 @@ class BaseChannelRecord:
                         channel_record.last_msg_id = e.id
                         continue
                     if isinstance(e, MessageFailureError):
-                        channel_record = await session.get(cls, e.channel_id)
                         if cfg.disable_bad_channels:
-                            channel_record.enabled = False
-                        logger.exception(e)
+                            channel_record = await session.get(cls, e.channel_id)
+                            if channel_record:
+                                channel_record.enabled = False
                     if isinstance(e, BaseException):
                         logger.exception(e)
                 await session.commit()
