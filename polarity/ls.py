@@ -139,7 +139,7 @@ def format_sector_data_for_discord(
     data_strings = []
 
     for data in [legend_data, master_data]:
-        champs_string = space.em.join(
+        champs_string = space.figure.join(
             filter(
                 None,
                 [
@@ -151,7 +151,7 @@ def format_sector_data_for_discord(
                 ],
             )
         )
-        shields_string = space.em.join(
+        shields_string = space.figure.join(
             filter(
                 None,
                 [
@@ -163,7 +163,7 @@ def format_sector_data_for_discord(
                 ],
             )
         )
-        data_string = f"{space.em}|{space.em}".join(
+        data_string = f"{space.figure}|{space.figure}".join(
             filter(
                 None,
                 [
@@ -280,7 +280,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
                 value=f"{EXOTIC_ENGRAM_EMOJI}{space.three_per_em}Exotic {sector.reward} (If-Solo)",
             )
             .add_field(
-                name=f"Champs or Shields",
+                name=f"Champs and Shields",
                 value=format_sector_data_for_discord(
                     sector.legend_data, sector.master_data
                 ),
