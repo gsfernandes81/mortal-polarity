@@ -35,16 +35,9 @@ class XurPostSettings(UrlPostSettings, Base):
     )
     default_gfx_url: str = cfg.defaults.xur.gfx_url
     default_post_url: str = cfg.defaults.xur.post_url
-    validity_period = staticmethod(weekend_period)
+    validity_period = weekend_period
     embed_command_name = "Xur"
     embed_command_description = "Xur infographic and post"
-
-    async def get_announce_embed(self, body: str = None, infographic=None) -> h.Embed:
-        embed = await super().get_announce_embed()
-        embed.description = body or embed.description
-        if infographic:
-            embed.set_image(infographic)
-        return embed
 
 
 class XurAutopostChannel(UrlAutopostChannel, Base):
@@ -58,138 +51,7 @@ class XurSignal(BaseUrlSignal):
     trigger_on_signal = WeekendResetSignal
 
 
-class XurAutopostsBase(UrlAutopostsBase):
-    def commands(self) -> lb.SlashCommandGroup:
-        # Announcement management commands for kyber
-        return wtf.Command[
-            wtf.Implements[lb.SlashSubGroup],
-            wtf.Name[self.announcement_name.lower().replace(" ", "_")],
-            wtf.Description[
-                "{} announcement management".format(self.announcement_name)
-            ],
-            wtf.Guilds[cfg.control_discord_server_id],
-            wtf.InheritChecks[True],
-            wtf.Subcommands[
-                # Autoposts Enable/Disable
-                wtf.Command[
-                    wtf.Name["autoposts"],
-                    wtf.Description["Enable or disable automatic announcements"],
-                    wtf.AutoDefer[True],
-                    wtf.InheritChecks[True],
-                    wtf.Options[
-                        wtf.Option[
-                            wtf.Name["option"],
-                            wtf.Description["Enable or disable"],
-                            wtf.Type[str],
-                            wtf.Choices["Enable", "Disable"],
-                            wtf.Required[True],
-                        ],
-                    ],
-                    wtf.Implements[lb.SlashSubCommand],
-                    wtf.Executes[self.autopost_ctrl],
-                ],
-                wtf.Command[
-                    wtf.Name["infogfx_url"],
-                    wtf.Description[
-                        "Set the {} infographic url, to check and post".format(
-                            self.announcement_name.lower()
-                        )
-                    ],
-                    wtf.AutoDefer[True],
-                    wtf.InheritChecks[True],
-                    wtf.Options[
-                        wtf.Option[
-                            wtf.Name["url"],
-                            wtf.Description["The url to set"],
-                            wtf.Type[str],
-                            wtf.Required[False],
-                        ],
-                    ],
-                    wtf.Implements[lb.SlashSubCommand],
-                    wtf.Executes[self.gfx_url],
-                ],
-                wtf.Command[
-                    wtf.Name["post_url"],
-                    wtf.Description[
-                        "Set the {} post url, to check and post".format(
-                            self.announcement_name.lower()
-                        )
-                    ],
-                    wtf.AutoDefer[True],
-                    wtf.InheritChecks[True],
-                    wtf.Options[
-                        wtf.Option[
-                            wtf.Name["url"],
-                            wtf.Description["The url to set"],
-                            wtf.Type[str],
-                            wtf.Required[False],
-                        ],
-                    ],
-                    wtf.Implements[lb.SlashSubCommand],
-                    wtf.Executes[self.post_url],
-                ],
-                wtf.Command[
-                    wtf.Name["update"],
-                    wtf.Description["Update a post"],
-                    wtf.AutoDefer[True],
-                    wtf.InheritChecks[True],
-                    wtf.Options[
-                        wtf.Option[
-                            wtf.Name["body"],
-                            wtf.Description["The infographic image to use"],
-                            wtf.Type[str],
-                            wtf.Required[False],
-                            wtf.Default[None],
-                        ],
-                        wtf.Option[
-                            wtf.Name["infographic"],
-                            wtf.Description["The infographic image to use"],
-                            wtf.Type[h.Attachment],
-                            wtf.Required[False],
-                            wtf.Default[None],
-                        ],
-                    ],
-                    wtf.Implements[lb.SlashSubCommand],
-                    wtf.Executes[self.rectify_announcement],
-                ],
-                wtf.Command[
-                    wtf.Name["announce"],
-                    wtf.Description["Trigger an announcement manually"],
-                    wtf.AutoDefer[True],
-                    wtf.InheritChecks[True],
-                    wtf.Options[
-                        wtf.Option[
-                            wtf.Name["body"],
-                            wtf.Description["The infographic image to use"],
-                            wtf.Type[str],
-                            wtf.Required[False],
-                            wtf.Default[None],
-                        ],
-                        wtf.Option[
-                            wtf.Name["infographic"],
-                            wtf.Description["The infographic image to use"],
-                            wtf.Type[h.Attachment],
-                            wtf.Required[False],
-                            wtf.Default[None],
-                        ],
-                    ],
-                    wtf.Implements[lb.SlashSubCommand],
-                    wtf.Executes[self.manual_announce],
-                ],
-            ],
-        ]
-
-    async def manual_announce(self, ctx: lb.Context):
-        faux_event = self.autopost_trigger_signal.register(ctx.bot)
-        await ctx.respond("Announcements being sent out now")
-        await XurAutopostChannel._announcer(
-            faux_event,
-            body=ctx.options.body,
-            infographic=ctx.options.infographic,
-        )
-
-
-xur = XurAutopostsBase(
+xur = UrlAutopostsBase(
     settings_table=XurPostSettings,
     channel_table=XurAutopostChannel,
     autopost_trigger_signal=XurSignal,

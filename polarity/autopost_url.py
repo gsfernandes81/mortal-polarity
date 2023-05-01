@@ -135,11 +135,13 @@ class UrlPostSettings(BasePostSettings):
                     return self
                 await asyncio.sleep(check_interval)
 
-    async def get_announce_embed(self, date: dt.date = None) -> h.Embed:
-        await self.update_url()
-        # Use the db date if none is specified
-        if date is None:
+    async def get_announce_embed(self, infographic=None) -> h.Embed:
+        # Use the current date if infographic is specified
+        if infographic is None:
+            await self.update_url()
             date = self.url_last_modified
+        else:
+            date = dt.datetime.now(tz=dt.timezone.utc)
         # Get the period of validity for this message
         start_date, end_date = self.validity_period(date)
         # Follow urls 1 step into redirects
@@ -156,12 +158,17 @@ class UrlPostSettings(BasePostSettings):
             "post_url": post_url,
             "gfx_url": gfx_url,
         }
-        return h.Embed(
+        embed = h.Embed(
             title=self.embed_title.format(**format_dict),
             url=format_dict["post_url"],
             description=self.embed_description.format(**format_dict),
             color=cfg.kyber_pink,
         ).set_image(format_dict["gfx_url"])
+
+        if infographic:
+            embed.set_image(infographic)
+
+        return embed
 
     # Note cls is applied partially durign register_embed_user_cmd
     @staticmethod
@@ -349,6 +356,15 @@ class UrlAutopostsBase(AutopostsBase):
                     wtf.Description["Update a post"],
                     wtf.AutoDefer[True],
                     wtf.InheritChecks[True],
+                    wtf.Options[
+                        wtf.Option[
+                            wtf.Name["infographic"],
+                            wtf.Description["The infographic image to use"],
+                            wtf.Type[h.Attachment],
+                            wtf.Required[False],
+                            wtf.Default[None],
+                        ],
+                    ],
                     wtf.Implements[lb.SlashSubCommand],
                     wtf.Executes[self.rectify_announcement],
                 ],
@@ -357,6 +373,15 @@ class UrlAutopostsBase(AutopostsBase):
                     wtf.Description["Trigger an announcement manually"],
                     wtf.AutoDefer[True],
                     wtf.InheritChecks[True],
+                    wtf.Options[
+                        wtf.Option[
+                            wtf.Name["infographic"],
+                            wtf.Description["The infographic image to use"],
+                            wtf.Type[h.Attachment],
+                            wtf.Required[False],
+                            wtf.Default[None],
+                        ],
+                    ],
                     wtf.Implements[lb.SlashSubCommand],
                     wtf.Executes[self.manual_announce],
                 ],
@@ -462,7 +487,6 @@ class UrlAutopostsBase(AutopostsBase):
                 percentage_progress = 0
                 none_counter = 0
                 for idx, channel_record in enumerate(channel_record_list):
-
                     if channel_record.last_msg_id is None:
                         none_counter += 1
                         continue
@@ -486,5 +510,9 @@ class UrlAutopostsBase(AutopostsBase):
 
     # Manually trigger an announcement event
     async def manual_announce(self, ctx: lb.Context):
-        self.autopost_trigger_signal.dispatch_with(bot=ctx.bot)
+        faux_event = self.autopost_trigger_signal.register(ctx.bot)
         await ctx.respond("Announcements being sent out now")
+        await self.autopost_channel_table._announcer(
+            faux_event,
+            infographic=ctx.options.infographic,
+        )
