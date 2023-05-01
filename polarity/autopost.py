@@ -289,8 +289,8 @@ class BaseChannelRecord:
 
                 for e in exceptions:
                     if isinstance(e, h.Message):
-                        msg: h.Message = e
-                        channel_record.last_msg_id = msg.id
+                        channel_record = await session.get(cls, e.channel_id)
+                        channel_record.last_msg_id = e.id
                         continue
                     if isinstance(e, MessageFailureError):
                         channel_record = await session.get(cls, e.channel_id)
