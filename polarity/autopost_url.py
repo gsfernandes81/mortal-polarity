@@ -354,7 +354,7 @@ class UrlAutopostsBase(AutopostsBase):
                 wtf.Command[
                     wtf.Name["update"],
                     wtf.Description["Update a post"],
-                    wtf.AutoDefer[True],
+                    wtf.AutoDefer[False],
                     wtf.InheritChecks[True],
                     wtf.Options[
                         wtf.Option[
@@ -458,6 +458,7 @@ class UrlAutopostsBase(AutopostsBase):
     async def rectify_announcement(self, ctx: lb.Context):
         """Correct a mistake in the announcement,
         pull from urls again and update existing posts"""
+        await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
         async with db_session() as session:
             async with session.begin():
                 settings: UrlPostSettings = await session.get(self.settings_table, 0)
@@ -482,7 +483,7 @@ class UrlAutopostsBase(AutopostsBase):
             logger.info("Correcting posts")
             with operation_timer("Announce correction", logger):
                 await ctx.respond("Correcting posts now")
-                embed = await settings.get_announce_embed()
+                embed = await settings.get_announce_embed(ctx.options.infographic)
                 no_of_channels = len(channel_record_list)
                 percentage_progress = 0
                 none_counter = 0
