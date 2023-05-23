@@ -15,8 +15,8 @@
 
 # End user facing command implementations for the bot
 
-import asyncio
 import logging
+import typing as t
 
 import hikari as h
 import lightbulb as lb
@@ -26,12 +26,7 @@ from sqlalchemy.sql.schema import Column
 
 from . import cfg, ls
 from .autopost import BaseCustomEvent
-from .utils import (
-    Base,
-    db_session,
-    follow_link_single_step,
-    url_regex,
-)
+from .utils import Base, db_session, follow_link_single_step, url_regex
 
 command_registry = {}
 
@@ -253,9 +248,30 @@ async def edit_command(ctx: lb.Context):
             await ctx.respond("Command updated")
 
 
+async def check_if_admin(app: lb.BotApp, user_id: t.Union[int, h.PartialUser]):
+    """Check if a user is an admin on the control server"""
+
+    try:
+        member: h.Member = app.cache.get_member(
+            cfg.control_discord_server_id, user_id
+        ) or await app.rest.fetch_member(cfg.control_discord_server_id, user_id)
+
+        if cfg.admin_role in member.role_ids:
+            return True
+        else:
+            return False
+
+    except h.NotFoundError:
+        return False
+
+
 @lb.command("lstoday", "Find out about today's lost sector", auto_defer=True)
 @lb.implements(lb.SlashCommand)
 async def ls_command(ctx: lb.Context):
+    # If admin then update data before returning
+    if await check_if_admin(ctx.bot, ctx.user):
+        await ls.rotation_update_task._callback()
+
     async with db_session() as session:
         async with session.begin():
             settings: ls.LostSectorPostSettings = await session.get(
