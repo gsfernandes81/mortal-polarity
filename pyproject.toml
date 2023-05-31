@@ -17,7 +17,7 @@ SQLAlchemy = "^1.4.41"
 hikari = { extras = ["speedups"], version = "==2.0.0.dev115" }
 hikari-lightbulb = "^2.2"
 uvloop = "^0.17.0"
-sector_accounting = {git = "https://github.com/gs729/sector_accounting.git", rev = "7c1a7c4"}
+sector_accounting = {git = "https://github.com/gs729/sector_accounting.git", rev = "ae0dcc9"}
 requests = "^2.28.1"
 APScheduler = "^3.9.1"
 aiohttp = ">=3.8.3"
