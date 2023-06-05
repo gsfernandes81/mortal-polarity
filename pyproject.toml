@@ -6,7 +6,7 @@ authors = ["GS <gsfernandes81@gmail.com>"]
 license = "GNU AGPL-3.0-or-later"
 
 [tool.poetry.dependencies]
-python = "~3.9.0"
+python = "~3.11.0"
 postgres = "*"
 psycopg2-binary = "*"
 psycopg2-pool = "*"
@@ -14,19 +14,21 @@ asyncpg = "*"
 aiofiles = "*"
 alembic = "*"
 SQLAlchemy = "^1.4.41"
-hikari = { extras = ["speedups"], version = "==2.0.0.dev115" }
+hikari = { extras = ["speedups"], version = "==2.0.0.dev119" }
+# The below is a hikari/aiohttp speedups dependency
+faust-cchardet = "^2.1.18"
 hikari-lightbulb = "^2.2"
 uvloop = "^0.17.0"
 sector_accounting = {git = "https://github.com/gs729/sector_accounting.git", rev = "ae0dcc9"}
+lightbulb-ext-wtf = {git = "https://github.com/gs729/lightbulb-ext-wtf.git", rev = "24a7dd2"}
+
 requests = "^2.28.1"
 APScheduler = "^3.9.1"
 aiohttp = ">=3.8.3"
-lightbulb-ext-wtf = { git = "https://github.com/tandemdude/lightbulb-ext-wtf.git" }
 tweepy = ">=4.12.0"
-hikari-toolbox = { git = "https://github.com/brazier-dev/hikari-toolbox.git", rev = "ac4810d" }
+hikari-toolbox = { git = "https://github.com/brazier-dev/hikari-toolbox.git" }
 setuptools = "^65.0.0"
-# Avoid yarl 1.8.1 hash failures 
-yarl = "=1.8.0"
+yarl = "^1.9.2"
 honcho = "^1.1.0"
 
 [tool.poetry.dev-dependencies]

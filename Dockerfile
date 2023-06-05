@@ -1,11 +1,11 @@
-FROM python:3.9-slim as base
+FROM python:3.11-alpine as base
 
-ENV PYTHONUNBUFFERED=1
+RUN apk update
+RUN apk add --no-cache git
 
-RUN apt-get update && apt-get install -y gcc libffi-dev g++ git
 WORKDIR /app
 
-FROM base as builder
+FROM base as builder-base
 
 ENV PIP_DEFAULT_TIMEOUT=100 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -16,7 +16,9 @@ RUN pip install "poetry==$POETRY_VERSION"
 RUN python -m venv /venv
 
 COPY pyproject.toml poetry.lock ./
-RUN . /venv/bin/activate && poetry install --no-dev --no-root
+RUN . /venv/bin/activate && poetry install --without dev --no-root
+
+FROM builder-base as builder
 
 COPY . .
 RUN . /venv/bin/activate && poetry build
@@ -30,4 +32,4 @@ COPY Procfile ./
 COPY Procfile.release ./
 
 RUN . /venv/bin/activate && pip install *.whl
-CMD ["./docker-entrypoint.sh"]
+CMD ["sh", "docker-entrypoint.sh"]
