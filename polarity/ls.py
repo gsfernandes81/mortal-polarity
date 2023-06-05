@@ -30,6 +30,7 @@ from pytz import utc
 from sector_accounting import Rotation, Sector
 from sector_accounting.sector_accounting import DifficultySpecificSectorData
 from sqlalchemy import select
+from hmessage import HMessage
 
 from . import cfg
 from .autopost import (
@@ -43,7 +44,7 @@ from .utils import (
     Base,
     _create_or_get,
     _download_linked_image,
-    _edit_embedded_message,
+    _edit_message,
     _run_in_thread_pool,
     alert_owner,
     db_session,
@@ -208,7 +209,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
             sector=sector, weapon_emoji=weapon_emoji
         )
 
-    async def get_announce_embed(self, date: dt.date = None) -> h.Embed:
+    async def get_announce_message(self, date: dt.date = None) -> h.Embed:
         buffer = 1  # Minute
         if date is None:
             date = dt.datetime.now(tz=utc) - dt.timedelta(hours=16, minutes=60 - buffer)
@@ -301,7 +302,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
         if ls_gfx_url:
             embed.set_image(ls_gfx_url)
 
-        return embed
+        return HMessage(embeds=[embed])
 
     async def get_twitter_data_tuple(self, date: dt.date = None) -> Tuple[str, str]:
         date = date or dt.datetime.now(tz=utc)
@@ -542,8 +543,7 @@ class LostSectors(AutopostsBase):
             logger.info("Correcting posts")
             with operation_timer("Announce correction", logger):
                 await ctx.respond("Correcting posts now")
-                embed = await settings.get_announce_embed()
-
+                message = await settings.get_announce_message()
                 no_of_channels = len(channel_record_list)
                 percentage_progress = 0
                 none_counter = 0
@@ -553,11 +553,11 @@ class LostSectors(AutopostsBase):
                         none_counter += 1
                         continue
 
-                    await _edit_embedded_message(
+                    await _edit_message(
                         channel_record.last_msg_id,
                         channel_record.id,
                         ctx.bot,
-                        embed,
+                        message.to_message_kwargs(),
                         logger=logger,
                     )
 

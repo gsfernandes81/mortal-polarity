@@ -30,6 +30,7 @@ hikari-toolbox = { git = "https://github.com/brazier-dev/hikari-toolbox.git" }
 setuptools = "^65.0.0"
 yarl = "^1.9.2"
 honcho = "^1.1.0"
+hikari-message = {git = "https://github.com/gs729/hikari-message.git"}
 
 [tool.poetry.dev-dependencies]
 pyflakes = "*"

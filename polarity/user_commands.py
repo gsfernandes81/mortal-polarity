@@ -277,8 +277,8 @@ async def ls_command(ctx: lb.Context):
             settings: ls.LostSectorPostSettings = await session.get(
                 ls.LostSectorPostSettings, 0
             )
-    embed = await settings.get_announce_embed()
-    await ctx.respond(embed=embed)
+    message = await settings.get_announce_message()
+    await ctx.respond(**message.to_message_kwargs())
 
 
 async def command_options_updater(event: RefreshCmdListEvent):

@@ -22,11 +22,12 @@ import functools
 import logging
 from calendar import month_name as month
 from typing import Callable, List, Type
-import aiohttp
 
+import aiohttp
 import hikari as h
 import lightbulb as lb
 import lightbulb.ext.wtf as wtf
+from hmessage import HMessage
 from sqlalchemy import Column, select
 from sqlalchemy.orm import declarative_mixin
 from sqlalchemy.types import Boolean, DateTime, String
@@ -40,12 +41,11 @@ from .autopost import (
 )
 from .utils import (
     _create_or_get,
-    _edit_embedded_message,
+    _edit_message,
     db_session,
     follow_link_single_step,
     operation_timer,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +135,7 @@ class UrlPostSettings(BasePostSettings):
                     return self
                 await asyncio.sleep(check_interval)
 
-    async def get_announce_embed(self, infographic=None) -> h.Embed:
+    async def get_announce_message(self, infographic=None) -> h.Embed:
         # Use the current date if infographic is specified
         if infographic is None:
             await self.update_url()
@@ -168,7 +168,7 @@ class UrlPostSettings(BasePostSettings):
         if infographic:
             embed.set_image(infographic)
 
-        return embed
+        return HMessage(embeds=[embed])
 
     # Note cls is applied partially durign register_embed_user_cmd
     @staticmethod
@@ -176,7 +176,7 @@ class UrlPostSettings(BasePostSettings):
         async with db_session() as session:
             async with session.begin():
                 settings = await session.get(cls, cls.default_id)
-                await ctx.respond(embed=await settings.get_announce_embed())
+                await ctx.respond(**(await settings.get_announce_message()).to_message_kwargs())
 
     @classmethod
     def register_embed_user_cmd(cls, bot: lb.BotApp):
@@ -483,7 +483,7 @@ class UrlAutopostsBase(AutopostsBase):
             logger.info("Correcting posts")
             with operation_timer("Announce correction", logger):
                 await ctx.respond("Correcting posts now")
-                embed = await settings.get_announce_embed(ctx.options.infographic)
+                message: HMessage = await settings.get_announce_message(ctx.options.infographic)
                 no_of_channels = len(channel_record_list)
                 percentage_progress = 0
                 none_counter = 0
@@ -492,11 +492,11 @@ class UrlAutopostsBase(AutopostsBase):
                         none_counter += 1
                         continue
 
-                    await _edit_embedded_message(
+                    await _edit_message(
                         channel_record.last_msg_id,
                         channel_record.id,
                         ctx.bot,
-                        embed,
+                        message.to_message_kwargs(),
                         logger=logger,
                     )
 

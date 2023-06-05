@@ -203,11 +203,11 @@ async def send_message(
         return message
 
 
-async def _edit_embedded_message(
+async def _edit_message(
     message_id: int,
     channel_id: int,
     bot: h.GatewayBot,
-    embed: h.Embed,
+    message_kwargs: dict,
     logger=logging.getLogger("main/" + __name__),
 ) -> None:
     try:
@@ -215,7 +215,7 @@ async def _edit_embedded_message(
             message_id
         ) or await bot.rest.fetch_message(channel_id, message_id)
 
-        await msg.edit(content="", embed=embed, components=None)
+        await msg.edit(**message_kwargs)
     except (h.ForbiddenError, h.NotFoundError):
         logger.warning("Message {} not found or not editable".format(message_id))
 

@@ -26,6 +26,7 @@ from aiohttp import web
 from sqlalchemy import BigInteger, Boolean, Integer, select
 from sqlalchemy.orm import declarative_mixin, declared_attr
 from sqlalchemy.sql.schema import Column
+from hmessage import HMessage
 
 from . import cfg, custom_checks
 from .controller import kyber as control_cmd_group
@@ -61,7 +62,7 @@ class BasePostSettings:
         self.id = id
         self.autoannounce_enabled = autoannounce_enabled
 
-    async def get_announce_embed(self) -> h.Embed:
+    async def get_announce_message(self) -> HMessage:
         pass
 
 
@@ -260,7 +261,7 @@ class BaseChannelRecord:
                 "Announcing posts to {} channels".format(len(channel_id_list))
             )
             with operation_timer("Announce", logger):
-                embed = await settings.get_announce_embed(**kwargs)
+                message = await settings.get_announce_message(**kwargs)
                 exceptions: List[
                     Union[None, MessageFailureError]
                 ] = await asyncio.gather(
@@ -269,7 +270,7 @@ class BaseChannelRecord:
                             send_message(
                                 event.app,
                                 cls.follow_channel,
-                                message_kwargs={"embed": embed},
+                                message_kwargs=message.to_message_kwargs(),
                                 crosspost=True,
                             )
                         ]
@@ -277,7 +278,7 @@ class BaseChannelRecord:
                             send_message(
                                 event.app,
                                 channel_id,
-                                message_kwargs={"embed": embed},
+                                message_kwargs=message.to_message_kwargs(),
                                 crosspost=True,
                             )
                             for channel_id in channel_id_list
