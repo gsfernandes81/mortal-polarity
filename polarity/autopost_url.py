@@ -176,7 +176,9 @@ class UrlPostSettings(BasePostSettings):
         async with db_session() as session:
             async with session.begin():
                 settings = await session.get(cls, cls.default_id)
-                await ctx.respond(**(await settings.get_announce_message()).to_message_kwargs())
+                await ctx.respond(
+                    **(await settings.get_announce_message()).to_message_kwargs()
+                )
 
     @classmethod
     def register_embed_user_cmd(cls, bot: lb.BotApp):
@@ -483,7 +485,9 @@ class UrlAutopostsBase(AutopostsBase):
             logger.info("Correcting posts")
             with operation_timer("Announce correction", logger):
                 await ctx.respond("Correcting posts now")
-                message: HMessage = await settings.get_announce_message(ctx.options.infographic)
+                message: HMessage = await settings.get_announce_message(
+                    ctx.options.infographic
+                )
                 no_of_channels = len(channel_record_list)
                 percentage_progress = 0
                 none_counter = 0

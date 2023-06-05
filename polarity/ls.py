@@ -209,7 +209,14 @@ class LostSectorPostSettings(BasePostSettings, Base):
             sector=sector, weapon_emoji=weapon_emoji
         )
 
-    async def get_announce_message(self, date: dt.date = None) -> h.Embed:
+    async def get_announce_message(
+        self,
+        date: dt.date = None,
+        thumbnail: h.Attachment = None,
+        secondary_image: h.Attachment = None,
+        secondary_embed_title: str = "",
+        secondary_embed_description: str = "",
+    ) -> h.Embed:
         buffer = 1  # Minute
         if date is None:
             date = dt.datetime.now(tz=utc) - dt.timedelta(hours=16, minutes=60 - buffer)
@@ -302,7 +309,21 @@ class LostSectorPostSettings(BasePostSettings, Base):
         if ls_gfx_url:
             embed.set_image(ls_gfx_url)
 
-        return HMessage(embeds=[embed])
+        if thumbnail:
+            embed.set_thumbnail(thumbnail)
+
+        if secondary_image:
+            embed2 = h.Embed(
+                title=secondary_embed_title,
+                description=secondary_embed_description,
+                color=cfg.kyber_pink,
+            )
+            embed2.set_image(secondary_image)
+            embeds = [embed, embed2]
+        else:
+            embeds = [embed]
+
+        return HMessage(embeds=embeds)
 
     async def get_twitter_data_tuple(self, date: dt.date = None) -> Tuple[str, str]:
         date = date or dt.datetime.now(tz=utc)

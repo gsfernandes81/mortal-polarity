@@ -265,9 +265,23 @@ async def check_if_admin(app: lb.BotApp, user_id: t.Union[int, h.PartialUser]):
         return False
 
 
-@lb.command("lstoday", "Find out about today's lost sector", auto_defer=True)
+@lb.option(
+    "secondary_image_description", "Secondary image description", type=str, default=""
+)
+@lb.option("secondary_image_title", "Secondary image title", type=str, default="")
+@lb.option("secondary_image", "Secondary image", type=h.Attachment, default=None)
+@lb.option("thumbnail", "Thumbnail", type=h.Attachment, default=None)
+@lb.command(
+    "lstoday", "Find out about today's lost sector", auto_defer=True, pass_options=True
+)
 @lb.implements(lb.SlashCommand)
-async def ls_command(ctx: lb.Context):
+async def ls_command(
+    ctx: lb.Context,
+    thumbnail: h.Attachment,
+    secondary_image: h.Attachment,
+    secondary_image_title: str,
+    secondary_image_description: str,
+):
     # If admin then update data before returning
     if await check_if_admin(ctx.bot, ctx.user):
         await ls.rotation_update_task._callback()
@@ -277,7 +291,12 @@ async def ls_command(ctx: lb.Context):
             settings: ls.LostSectorPostSettings = await session.get(
                 ls.LostSectorPostSettings, 0
             )
-    message = await settings.get_announce_message()
+    message = await settings.get_announce_message(
+        thumbnail=thumbnail,
+        secondary_image=secondary_image,
+        secondary_embed_title=secondary_image_title,
+        secondary_embed_description=secondary_image_description,
+    )
     await ctx.respond(**message.to_message_kwargs())
 
 
