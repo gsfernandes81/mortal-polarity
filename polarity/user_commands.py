@@ -265,22 +265,12 @@ async def check_if_admin(app: lb.BotApp, user_id: t.Union[int, h.PartialUser]):
         return False
 
 
-@lb.option(
-    "secondary_image_description", "Secondary image description", type=str, default=""
-)
-@lb.option("secondary_image_title", "Secondary image title", type=str, default="")
-@lb.option("secondary_image", "Secondary image", type=h.Attachment, default=None)
-@lb.option("thumbnail", "Thumbnail", type=h.Attachment, default=None)
-@lb.command(
-    "lstoday", "Find out about today's lost sector", auto_defer=True, pass_options=True
-)
-@lb.implements(lb.SlashCommand)
-async def ls_command(
+async def ls_command_base(
     ctx: lb.Context,
-    thumbnail: h.Attachment,
-    secondary_image: h.Attachment,
-    secondary_image_title: str,
-    secondary_image_description: str,
+    thumbnail: h.Attachment = None,
+    secondary_image: h.Attachment = None,
+    secondary_image_title: str = "",
+    secondary_image_description: str = "",
 ):
     # If admin then update data before returning
     if await check_if_admin(ctx.bot, ctx.user):
@@ -298,6 +288,30 @@ async def ls_command(
         secondary_embed_description=secondary_image_description,
     )
     await ctx.respond(**message.to_message_kwargs())
+
+
+@lb.command("lstoday", "Find out about today's lost sector", auto_defer=True)
+@lb.implements(lb.SlashCommand)
+async def ls_command(ctx: lb.Context):
+    await ls_command_base(ctx)
+
+
+@lb.option(
+    "secondary_image_description", "Secondary image description", type=str, default=""
+)
+@lb.option("secondary_image_title", "Secondary image title", type=str, default="")
+@lb.option("secondary_image", "Secondary image", type=h.Attachment, default=None)
+@lb.option("thumbnail", "Thumbnail", type=h.Attachment, default=None)
+@lb.command(
+    "lsprerelease",
+    "Find out about today's lost sector",
+    auto_defer=True,
+    pass_options=True,
+    guilds=[cfg.control_discord_server_id],
+)
+@lb.implements(lb.SlashCommand)
+async def ls_command_prerelease(ctx: lb.Context, **kwargs):
+    ls_command_base(ctx, **kwargs)
 
 
 async def command_options_updater(event: RefreshCmdListEvent):
@@ -343,7 +357,13 @@ async def on_error(event: lb.CommandErrorEvent):
 
 def register(bot: lb.BotApp):
     # Register all commands and listeners with the bot
-    for command in [add_command, del_command, edit_command, ls_command]:
+    for command in [
+        add_command,
+        del_command,
+        edit_command,
+        ls_command,
+        ls_command_prerelease,
+    ]:
         bot.command(command)
 
     for event, handler in [
