@@ -311,7 +311,7 @@ async def ls_command(ctx: lb.Context):
 )
 @lb.implements(lb.SlashCommand)
 async def ls_command_prerelease(ctx: lb.Context, **kwargs):
-    ls_command_base(ctx, **kwargs)
+    await ls_command_base(ctx, **kwargs)
 
 
 async def command_options_updater(event: RefreshCmdListEvent):
