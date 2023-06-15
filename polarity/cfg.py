@@ -70,6 +70,8 @@ tw_cons_key = str(_getenv("TWITTER_CONSUMER_KEY"))
 tw_cons_secret = str(_getenv("TWITTER_CONSUMER_SECRET"))
 tw_access_tok = str(_getenv("TWITTER_ACCESS_TOKEN"))
 tw_access_tok_secret = str(_getenv("TWITTER_ACCESS_TOKEN_SECRET"))
+tw_bearer_tok = str(_getenv("TWITTER_BEARER_TOKEN"))
+
 
 lightbulb_params = (
     # Only use the test env for testing if it is specified

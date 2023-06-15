@@ -465,6 +465,13 @@ class LostSectors(AutopostsBase):
                 cfg.tw_access_tok_secret,
             )
         )
+        self._twitter_v2 = tweepy.Client(
+            cfg.tw_bearer_tok,
+            cfg.tw_cons_key,
+            cfg.tw_cons_secret,
+            cfg.tw_access_tok,
+            cfg.tw_access_tok_secret,
+        )
 
     def register(self, bot: lb.BotApp) -> None:
         LostSectorSignal.register(bot)
@@ -628,10 +635,7 @@ class LostSectors(AutopostsBase):
             )
 
             # Use the lost sector image in the tweet
-            self._twitter.update_status(
-                tweet_string,
-                media_ids=[media_id],
-            )
+            self._twitter_v2.create_tweet(text=tweet_string, media_ids=[media_id])
         # If we don't have a lost sector graphic, we can't use it of course
         # so we proceed with a text only tweet
         else:
