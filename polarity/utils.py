@@ -28,6 +28,7 @@ import aiohttp
 import attr
 import hikari as h
 import lightbulb as lb
+import miru as m
 import toolbox
 import yarl
 from pytz import utc
@@ -142,16 +143,11 @@ def _embed_for_migration(original_embed: h.Embed):
     )
 
 
-def _component_for_migration(bot: lb.BotApp):
-    return (
-        bot.rest.build_message_action_row()
-        .add_button(h.ButtonStyle.LINK, cfg.migration_invite)
-        .set_label("Re-Invite")
-        .add_to_container()
-        .add_button(h.ButtonStyle.LINK, cfg.migration_help)
-        .set_label("Help")
-        .add_to_container(),
-    )
+def _components_for_migration(bot: lb.BotApp):
+    view = m.View()
+    view.add_item(m.Button(url=cfg.migration_invite, label="Re-Invite"))
+    view.add_item(m.Button(url=cfg.migration_help, label="Help"))
+    return view
 
 
 async def _bot_has_webhook_perms(

@@ -1113,6 +1113,25 @@ reference = "HEAD"
 resolved_reference = "0f5338314c02ecfc4b28daa1e73dfdb728a6b4d0"
 
 [[package]]
+name = "hikari-miru"
+version = "3.1.1"
+description = "An alternative component handler for hikari, inspired by discord.py's views."
+category = "main"
+optional = false
+python-versions = ">=3.8.0,<3.12"
+files = [
+    {file = "hikari-miru-3.1.1.tar.gz", hash = "sha256:16f4e5863e97891a357076473c7dd5bed428a81fa3ca4e721dd707cbb6f9697d"},
+    {file = "hikari_miru-3.1.1-py3-none-any.whl", hash = "sha256:efc7fba3c07a1c37309f7a98a89f758d154bccaede5f9374763881716d910bee"},
+]
+
+[package.dependencies]
+colorama = {version = "*", markers = "sys_platform == \"win32\""}
+hikari = ">=2.0.0.dev118"
+
+[package.extras]
+docs = ["furo (>=2022.1.2,<2022.2.0)", "sphinx (==4.4.0)"]
+
+[[package]]
 name = "hikari-toolbox"
 version = "0.1.5"
 description = "Utility functions for hikari, a Discord API wrapper."
@@ -2309,4 +2328,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.11.0"
-content-hash = "6ec07c3ac1e570d677cc4fcdc0b36edac5d9671722aeaa396f5d7c84f204af8d"
+content-hash = "62241d102a8806f136ef9c17e7fc8d231b9756252c6e21c85aaffff601cf045d"

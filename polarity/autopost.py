@@ -18,26 +18,26 @@ import functools
 import logging
 import re
 from abc import ABC, abstractmethod
-from typing import Type, Union, List
+from typing import List, Type, Union
 
 import hikari as h
 import lightbulb as lb
 from aiohttp import web
+from hmessage import HMessage
 from sqlalchemy import BigInteger, Boolean, Integer, select
 from sqlalchemy.orm import declarative_mixin, declared_attr
 from sqlalchemy.sql.schema import Column
-from hmessage import HMessage
 
 from . import cfg, custom_checks
 from .controller import kyber as control_cmd_group
 from .utils import (
-    send_message,
+    MessageFailureError,
+    _components_for_migration,
+    _embed_for_migration,
+    alert_owner,
     db_session,
     operation_timer,
-    _component_for_migration,
-    _embed_for_migration,
-    MessageFailureError,
-    alert_owner,
+    send_message,
 )
 
 app = web.Application()
@@ -203,26 +203,26 @@ class BaseChannelRecord:
             owner = await bot.rest.fetch_user((await bot.fetch_owner_ids())[0])
             await ctx.respond(
                 (
-                    'The bot does not have the "Manage Webhooks" permission here. '
-                    + "Please reinvite the bot with the below button "
-                    + "or contact {}#{} for assistance"
-                ).format(owner.username, owner.discriminator),
-                components=_component_for_migration(bot),
+                    'The bot does not seem to have the "Manage Webhooks" permission '
+                    + "here. Please reinvite the bot with the below button."
+                    + "or contact @{} for assistance"
+                ).format(owner.username),
+                components=_components_for_migration(bot),
             )
         except h.BadRequestError as e:
             owner = await bot.rest.fetch_user((await bot.fetch_owner_ids())[0])
             await ctx.respond(
                 "You cannot enable autoposts in an announcement channels "
-                + "or this channel type. please message {}#{} for assistance".format(
-                    owner.username, owner.discriminator
+                + "or this channel type. please message @{} for assistance".format(
+                    owner.username
                 ),
             )
             logger.exception(e)
         except Exception as e:
             owner = await bot.rest.fetch_user((await bot.fetch_owner_ids())[0])
             await ctx.respond(
-                "An unrecognized error has occured, please message {}#{}".format(
-                    owner.username, owner.discriminator
+                "An unrecognized error has occured, please message {}".format(
+                    owner.username
                 )
             )
             logger.exception(e)
