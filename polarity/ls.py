@@ -479,8 +479,9 @@ class LostSectors(AutopostsBase):
             bot, self.autopost_cmd_group, LostSectorSignal
         )
         self.control_cmd_group.child(self.commands())
-        bot.listen(LostSectorSignal)(self.announce_to_twitter)
-        bot.listen(LostSectorTwitterSignal)(self.announce_to_twitter)
+        # Temporarily disable twitter announcements
+        # bot.listen(LostSectorSignal)(self.announce_to_twitter)
+        # bot.listen(LostSectorTwitterSignal)(self.announce_to_twitter)
         bot.listen(LostSectorDiscordSignal)(LostSectorAutopostChannel.announcer)
 
     def commands(self):
