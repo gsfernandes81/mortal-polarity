@@ -185,14 +185,31 @@ async def send_message(
         ) or await bot.rest.fetch_channel(channel_id)
 
         message = await channel.send(**message_kwargs)
+
         if crosspost and isinstance(channel, h.GuildNewsChannel):
-            try:
-                await bot.rest.crosspost_message(channel, message)
-            except h.ForbiddenError:
-                # Crosspost if possible
-                # Ignore if not since we want the
-                # message to be returned still
-                pass
+            if channel.guild_id == cfg.kyber_discord_server_id:
+                # Retry more aggressively for the main server
+                for i in range(10):
+                    try:
+                        await bot.rest.crosspost_message(channel, message)
+                    except BaseException as e:
+                        success = False
+                        logging.exception(e)
+                        await asyncio.sleep(i)
+                    else:
+                        success = True
+                        break
+                if not success:
+                    logging.error("FAILED TO CROSSPOST MAIN SERVER WITH EXCEPTION:")
+                    logging.exception(e)
+            else:
+                try:
+                    await bot.rest.crosspost_message(channel, message)
+                except h.ForbiddenError:
+                    # Crosspost if possible
+                    # Ignore if not since we want the
+                    # message to be returned still
+                    pass
     except Exception as e:
         raise MessageFailureError(channel_id, message_kwargs, e)
     else:
