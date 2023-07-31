@@ -184,6 +184,12 @@ async def send_message(
             channel_id
         ) or await bot.rest.fetch_channel(channel_id)
 
+        if cfg.single_server_mode and channel.guild_id not in [
+            cfg.control_discord_server_id,
+            cfg.kyber_discord_server_id,
+        ]:
+            return
+
         message = await channel.send(**message_kwargs)
 
         if crosspost and isinstance(channel, h.GuildNewsChannel):

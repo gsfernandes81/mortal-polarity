@@ -23,6 +23,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 main_token = _getenv("MAIN_TOKEN")
 repeater_token = _getenv("MAIN_TOKEN")
 
+single_server_mode = _getenv("SINGLE_SERVER_MODE") or "false"
+single_server_mode = (
+    True if single_server_mode and single_server_mode.lower() == "true" else False
+)
+
 # Url for the bot and scheduler db
 # SQAlchemy doesn't play well with postgres://, hence we replace
 # it with postgresql://
@@ -79,6 +84,15 @@ lightbulb_params = (
     if test_env
     else {"token": main_token}  # Test env isn't specified in production
 )
+
+lightbulb_params = {"token": main_token}
+if test_env:
+    lightbulb_params["default_enabled_guilds"] = test_env
+elif single_server_mode:
+    lightbulb_params["default_enabled_guilds"] = [
+        kyber_discord_server_id,
+        control_discord_server_id,
+    ]
 
 gsheets_credentials = {
     "type": "service_account",
