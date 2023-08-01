@@ -19,7 +19,7 @@ hikari = { extras = ["speedups"], version = "==2.0.0.dev119" }
 faust-cchardet = "^2.1.18"
 hikari-lightbulb = "^2.2"
 uvloop = "^0.17.0"
-sector_accounting = {git = "https://github.com/gs729/sector_accounting.git", rev = "ae0dcc9"}
+sector_accounting = {git = "https://github.com/gs729/sector_accounting.git", rev = "5d92612"}
 lightbulb-ext-wtf = {git = "https://github.com/gs729/lightbulb-ext-wtf.git", rev = "24a7dd2"}
 
 requests = "^2.28.1"
