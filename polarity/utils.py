@@ -180,9 +180,12 @@ async def send_message(
     bot: lb.BotApp, channel_id: int, message_kwargs: dict, crosspost: bool = False
 ) -> h.Message:
     try:
-        channel = bot.cache.get_guild_channel(
-            channel_id
-        ) or await bot.rest.fetch_channel(channel_id)
+        try:
+            channel = bot.cache.get_guild_channel(
+                channel_id
+            ) or await bot.rest.fetch_channel(channel_id)
+        except:
+            return
 
         if cfg.single_server_mode and channel.guild_id not in [
             cfg.control_discord_server_id,

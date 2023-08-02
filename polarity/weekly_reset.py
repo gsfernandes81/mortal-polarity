@@ -40,7 +40,7 @@ class WeeklyResetPostSettings(UrlPostSettings, Base):
 class WeeklyResetAutopostChannel(UrlAutopostChannel, Base):
     settings_records = WeeklyResetPostSettings
     control_command_name = "reset"
-    follow_channel = cfg.reset_follow_channel_id
+    follow_channel = cfg.followables["weekly_reset"]
     autopost_friendly_name = "Weekly reset autoposts"
 
 

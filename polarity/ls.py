@@ -338,7 +338,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
 
 class LostSectorAutopostChannel(BaseChannelRecord, Base):
     settings_records: Type[BasePostSettings] = LostSectorPostSettings
-    follow_channel = cfg.ls_follow_channel_id
+    follow_channel = cfg.followables["lost_sector"]
     autopost_friendly_name = "Lost sector autoposts"
 
     @classmethod

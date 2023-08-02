@@ -14,6 +14,7 @@
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
 import abc
+import json
 from os import getenv as _getenv
 
 import hikari as h
@@ -67,9 +68,7 @@ migration_help = str(_getenv("MIGRATION_HELP"))
 migration_invite = str(_getenv("MIGRATION_INVITE"))
 disable_bad_channels = _getenv("DISABLE_BAD_CHANNELS").lower() == "true"
 
-ls_follow_channel_id = int(_getenv("LS_FOLLOW_CHANNEL_ID"))
-xur_follow_channel_id = int(_getenv("XUR_FOLLOW_CHANNEL_ID"))
-reset_follow_channel_id = int(_getenv("RESET_FOLLOW_CHANNEL_ID"))
+followables = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
 
 tw_cons_key = str(_getenv("TWITTER_CONSUMER_KEY"))
 tw_cons_secret = str(_getenv("TWITTER_CONSUMER_SECRET"))
