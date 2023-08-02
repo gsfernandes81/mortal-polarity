@@ -180,17 +180,14 @@ async def send_message(
     bot: lb.BotApp, channel_id: int, message_kwargs: dict, crosspost: bool = False
 ) -> h.Message:
     try:
+        if cfg.single_server_mode and channel_id not in list(cfg.followables.values()):
+            return
+
         try:
             channel = bot.cache.get_guild_channel(
                 channel_id
             ) or await bot.rest.fetch_channel(channel_id)
         except:
-            return
-
-        if cfg.single_server_mode and channel.guild_id not in [
-            cfg.control_discord_server_id,
-            cfg.kyber_discord_server_id,
-        ]:
             return
 
         message = await channel.send(**message_kwargs)
@@ -233,6 +230,8 @@ async def _edit_message(
     logger=logging.getLogger("main/" + __name__),
 ) -> None:
     try:
+        if channel_id not in list(cfg.followables.values()):
+            return
         msg: h.Message = bot.cache.get_message(
             message_id
         ) or await bot.rest.fetch_message(channel_id, message_id)

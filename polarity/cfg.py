@@ -15,6 +15,7 @@
 
 import abc
 import json
+import typing as t
 from os import getenv as _getenv
 
 import hikari as h
@@ -68,7 +69,7 @@ migration_help = str(_getenv("MIGRATION_HELP"))
 migration_invite = str(_getenv("MIGRATION_INVITE"))
 disable_bad_channels = _getenv("DISABLE_BAD_CHANNELS").lower() == "true"
 
-followables = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
+followables: t.Dict[str, int] = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
 
 tw_cons_key = str(_getenv("TWITTER_CONSUMER_KEY"))
 tw_cons_secret = str(_getenv("TWITTER_CONSUMER_SECRET"))
