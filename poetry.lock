@@ -1963,8 +1963,8 @@ pytz = "*"
 [package.source]
 type = "git"
 url = "https://github.com/gs729/sector_accounting.git"
-reference = "5d92612"
-resolved_reference = "5d926121356c33e5919f9b7e8009a62b3043805b"
+reference = "7b5d567"
+resolved_reference = "7b5d5677a7193016f9a8dd4f2538ab370b73c26e"
 
 [[package]]
 name = "setuptools"
@@ -2313,4 +2313,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.11.0"
-content-hash = "3f8399ba94db3ba252e787109b38cb147d9a76a3cccd4fb59c47725acbdfa48b"
+content-hash = "386a55aa89e603bcaa539292ec08bfc9eb88c7c536ae48225d1bced945acb15a"
