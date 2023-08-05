@@ -578,7 +578,10 @@ class LostSectors(AutopostsBase):
                 none_counter = 0
 
                 for idx, channel_record in enumerate(channel_record_list):
-                    if channel_record.last_msg_id is None:
+                    if (
+                        channel_record.last_msg_id is None
+                        or channel_record.id not in list(cfg.followables.values())
+                    ):
                         none_counter += 1
                         continue
 

@@ -32,7 +32,6 @@ import miru as m
 import toolbox
 import yarl
 from pytz import utc
-from sqlalchemy import update
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -177,7 +176,7 @@ class MessageFailureError(Exception):
 
 
 async def send_message(
-    bot: lb.BotApp, channel_id: int, message_kwargs: dict, crosspost: bool = False
+    bot: lb.BotApp, channel_id: int, message_kwargs: dict, crosspost: bool = True
 ) -> h.Message:
     try:
         if cfg.single_server_mode and channel_id not in list(cfg.followables.values()):
@@ -193,29 +192,21 @@ async def send_message(
         message = await channel.send(**message_kwargs)
 
         if crosspost and isinstance(channel, h.GuildNewsChannel):
-            if channel.guild_id == cfg.kyber_discord_server_id:
-                # Retry more aggressively for the main server
-                for i in range(10):
-                    try:
-                        await bot.rest.crosspost_message(channel, message)
-                    except BaseException as e:
-                        success = False
-                        logging.exception(e)
-                        await asyncio.sleep(i)
-                    else:
-                        success = True
-                        break
-                if not success:
-                    logging.error("FAILED TO CROSSPOST MAIN SERVER WITH EXCEPTION:")
-                    logging.exception(e)
-            else:
+            for i in range(10):
                 try:
                     await bot.rest.crosspost_message(channel, message)
-                except h.ForbiddenError:
-                    # Crosspost if possible
-                    # Ignore if not since we want the
-                    # message to be returned still
-                    pass
+                except BaseException as e:
+                    success = False
+                    logging.exception(e)
+                    await asyncio.sleep(i)
+                else:
+                    success = True
+                    break
+
+            if not success:
+                logging.error("FAILED TO CROSSPOST WITH EXCEPTION:")
+                logging.exception(e)
+
     except Exception as e:
         raise MessageFailureError(channel_id, message_kwargs, e)
     else:
@@ -332,3 +323,7 @@ class space:
     figure = "\u2007"
     en = "\u2002"
     em = "\u2003"
+
+
+def followable_name(*, id: int):
+    return next(key for key, value in cfg.followables.items() if value == id)

@@ -13,12 +13,11 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio
 import functools
 import logging
 import re
 from abc import ABC, abstractmethod
-from typing import List, Type, Union
+from typing import Type
 
 import hikari as h
 import lightbulb as lb
@@ -31,13 +30,11 @@ from sqlalchemy.sql.schema import Column
 from . import cfg, custom_checks
 from .controller import kyber as control_cmd_group
 from .utils import (
-    MessageFailureError,
     _components_for_migration,
-    _embed_for_migration,
     alert_owner,
     db_session,
-    operation_timer,
     send_message,
+    followable_name,
 )
 
 app = web.Application()
@@ -247,60 +244,23 @@ class BaseChannelRecord:
         async with db_session() as session:
             async with session.begin():
                 settings: BasePostSettings = await session.get(cls.settings_records, 0)
-            async with session.begin():
-                channel_id_list = (
-                    await session.execute(select(cls).where(cls.enabled == True))
-                ).fetchall()
-                channel_id_list = [] if channel_id_list is None else channel_id_list
-                channel_record_list = [channel[0] for channel in channel_id_list]
-                channel_id_list = [channel[0].id for channel in channel_id_list]
 
-            logger.info(
-                # Note, need to implement regex to specify which announcement
-                # is being carried out in these logs
-                "Announcing posts to {} channels".format(len(channel_id_list))
-            )
-            with operation_timer("Announce", logger):
+                followable_name_ = followable_name(id=cls.follow_channel)
+
+                logger.info("Announcing posts to channel {}".format(followable_name_))
                 message = await settings.get_announce_message(**kwargs)
-                exceptions: List[
-                    Union[None, MessageFailureError]
-                ] = await asyncio.gather(
-                    *(
-                        [
-                            send_message(
-                                event.app,
-                                cls.follow_channel,
-                                message_kwargs=message.to_message_kwargs(),
-                                crosspost=True,
-                            )
-                        ]
-                        + [
-                            send_message(
-                                event.app,
-                                channel_id,
-                                message_kwargs=message.to_message_kwargs(),
-                                crosspost=True,
-                            )
-                            for channel_id in channel_id_list
-                            if channel_id != cls.follow_channel
-                        ]
-                    ),
-                    return_exceptions=True
-                )
 
-                for e in exceptions:
-                    if isinstance(e, h.Message):
-                        channel_record = await session.get(cls, e.channel_id)
-                        channel_record.last_msg_id = e.id
-                        continue
-                    if isinstance(e, MessageFailureError):
-                        if cfg.disable_bad_channels:
-                            channel_record = await session.get(cls, e.channel_id)
-                            if channel_record:
-                                channel_record.enabled = False
-                    if isinstance(e, BaseException):
-                        logger.exception(e)
-                await session.commit()
+                try:
+                    message = await send_message(
+                        event.app,
+                        cls.follow_channel,
+                        message_kwargs=message.to_message_kwargs(),
+                    )
+                except Exception as e:
+                    logger.exception(e)
+                else:
+                    channel_record = await session.get(cls, cls.follow_channel)
+                    channel_record.last_msg_id = message.id
 
 
 class BaseCustomEvent(h.Event):

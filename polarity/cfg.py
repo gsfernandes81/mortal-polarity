@@ -14,12 +14,29 @@
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
 import abc
+import datetime as dt
 import json
 import typing as t
 from os import getenv as _getenv
 
 import hikari as h
 from sqlalchemy.ext.asyncio import AsyncSession
+
+
+def _lightbulb_params() -> dict:
+    intents = h.Intents.ALL_UNPRIVILEGED | h.Intents.MESSAGE_CONTENT
+    lightbulb_params = {
+        "token": discord_token,
+        "intents": intents,
+    }
+    # Only use the test env for testing if it is specified
+    if test_env:
+        lightbulb_params["default_enabled_guilds"] = test_env
+    else:
+        # Test env isn't specified in production
+        lightbulb_params["default_enabled_guilds"] = []
+    return lightbulb_params
+
 
 # Discord API Token
 main_token = _getenv("MAIN_TOKEN")
@@ -113,6 +130,32 @@ port = int(_getenv("PORT") or 5000)
 
 kyber_pink = h.Color(0xEC42A5)
 
+###### Environment variables ######
+
+# Discord environment config
+discord_token = _getenv("DISCORD_TOKEN")
+
+# Discord constants
+embed_default_color = h.Color(int(_getenv("EMBED_DEFAULT_COLOR"), 16))
+embed_error_color = h.Color(int(_getenv("EMBED_ERROR_COLOR"), 16))
+emoji = json.loads(_getenv("EMOJI"))
+followables = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
+default_url = _getenv("DEFAULT_URL")
+
+# Discord control server config
+control_discord_server_id = int(_getenv("CONTROL_DISCORD_SERVER_ID"))
+control_discord_role_id = int(_getenv("CONTROL_DISCORD_ROLE_ID"))
+kyber_discord_server_id = int(_getenv("KYBER_DISCORD_SERVER_ID"))
+log_channel = int(_getenv("LOG_CHANNEL_ID"))
+alerts_channel = int(_getenv("ALERTS_CHANNEL_ID"))
+
+
+#### Environment variables end ####
+
+###################################
+
+####### Configs & constants #######
+
 
 class defaults(abc.ABC):
     class xur(abc.ABC):
@@ -122,3 +165,10 @@ class defaults(abc.ABC):
     class weekly_reset(abc.ABC):
         gfx_url = "https://kyber3000.com/Reset"
         post_url = "https://kyber3000.com/Resetpost"
+
+
+# db_session_kwargs, db_session_kwargs_sync, db_connect_args = _db_config()
+lightbulb_params = _lightbulb_params()
+reset_time_tolerance = dt.timedelta(minutes=60)
+
+##### Configs & constants end #####

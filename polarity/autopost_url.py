@@ -44,7 +44,7 @@ from .utils import (
     _edit_message,
     db_session,
     follow_link_single_step,
-    operation_timer,
+    followable_name,
 )
 
 logger = logging.getLogger(__name__)
@@ -460,58 +460,37 @@ class UrlAutopostsBase(AutopostsBase):
     async def rectify_announcement(self, ctx: lb.Context):
         """Correct a mistake in the announcement,
         pull from urls again and update existing posts"""
-        await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
+        await ctx.respond("Correcting posts now")
+        logger.info("Correcting posts")
+
+        channel_id = int(self.autopost_channel_table.follow_channel)
+
         async with db_session() as session:
             async with session.begin():
                 settings: UrlPostSettings = await session.get(self.settings_table, 0)
+
                 if settings is None:
                     await ctx.respond("Please enable autoposts before using this cmd")
                 else:
                     await settings.update_url()
 
-                channel_record_list = (
-                    await session.execute(
-                        select(self.autopost_channel_table).where(
-                            self.autopost_channel_table.enabled == True
-                        )
-                    )
-                ).fetchall()
-                channel_record_list = (
-                    [] if channel_record_list is None else channel_record_list
-                )
-                channel_record_list: List[BaseChannelRecord] = [
-                    channel[0] for channel in channel_record_list
-                ]
-            logger.info("Correcting posts")
-            with operation_timer("Announce correction", logger):
-                await ctx.respond("Correcting posts now")
-                message: HMessage = await settings.get_announce_message(
-                    ctx.options.infographic
-                )
-                no_of_channels = len(channel_record_list)
-                percentage_progress = 0
-                none_counter = 0
-                for idx, channel_record in enumerate(channel_record_list):
-                    if channel_record.last_msg_id is None:
-                        none_counter += 1
-                        continue
+            channel_record = await session.get(self.autopost_channel_table, channel_id)
 
-                    await _edit_message(
-                        channel_record.last_msg_id,
-                        channel_record.id,
-                        ctx.bot,
-                        message.to_message_kwargs(),
-                        logger=logger,
-                    )
+            corrected_message: HMessage = await settings.get_announce_message(
+                ctx.options.infographic
+            )
 
-                    if percentage_progress < round(20 * (idx + 1) / no_of_channels) * 5:
-                        percentage_progress = round(20 * (idx + 1) / no_of_channels) * 5
-                        await ctx.edit_last_response(
-                            "Updating posts: {}%\n".format(percentage_progress)
-                        )
-                await ctx.edit_last_response(
-                    "{} posts corrected".format(no_of_channels - none_counter)
-                )
+            await _edit_message(
+                channel_record.last_msg_id,
+                channel_record.id,
+                ctx.bot,
+                corrected_message.to_message_kwargs(),
+                logger=logger,
+            )
+
+            await ctx.edit_last_response(
+                "{} posts corrected".format(followable_name(channel_id))
+            )
 
     # Manually trigger an announcement event
     async def manual_announce(self, ctx: lb.Context):
