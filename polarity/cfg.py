@@ -71,6 +71,7 @@ trigger_without_url_update = (
 )
 
 admin_role = int(_getenv("ADMIN_ROLE"))
+admins = [int(admin.strip()) for admin in _getenv("ADMINS").split(",")]
 alerts_channel_id = int(_getenv("ALERTS_CHANNEL_ID"))
 
 kyber_discord_server_id = int(_getenv("KYBER_DISCORD_SERVER_ID"))

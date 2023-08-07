@@ -21,7 +21,7 @@ import miru as m
 import uvloop
 from lightbulb.ext import tasks
 
-from . import cfg, controller
+from . import cfg, controller, embeds, posts
 from .autopost import autoposts
 from .ls import lost_sectors
 from .weekly_reset import weekly_reset
@@ -68,5 +68,7 @@ if __name__ == "__main__":
     lost_sectors.register(bot)
     weekly_reset.register(bot)
     xur.register(bot)
+    embeds.register(bot)
+    posts.register(bot)
     tasks.load(bot)
     bot.run()
