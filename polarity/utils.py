@@ -257,7 +257,7 @@ async def alert_owner(
     alert = "Warning:" + alert + " "
 
     if mention_mods:
-        alert = alert + "<@&{}> ".format(cfg.admin_role)
+        alert = alert + "<@&{}> ".format(cfg.control_discord_role_id)
 
     # If we get a single channel, turn it into a len() = 1 list
     if isinstance(channel, int):
