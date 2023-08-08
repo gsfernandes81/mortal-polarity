@@ -116,7 +116,6 @@ test_env = _test_env("TEST_ENV")
 # Discord constants
 embed_default_color = h.Color(int(_getenv("EMBED_DEFAULT_COLOR"), 16))
 embed_error_color = h.Color(int(_getenv("EMBED_ERROR_COLOR"), 16))
-emoji = json.loads(_getenv("EMOJI"))
 followables: t.Dict[str, int] = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
 
 # Database URLs
