@@ -30,7 +30,6 @@ from sqlalchemy.sql.schema import Column
 from . import cfg, custom_checks
 from .controller import kyber as control_cmd_group
 from .utils import (
-    _components_for_migration,
     alert_owner,
     db_session,
     send_message,
@@ -201,10 +200,9 @@ class BaseChannelRecord:
             await ctx.respond(
                 (
                     'The bot does not seem to have the "Manage Webhooks" permission '
-                    + "here. Please reinvite the bot with the below button."
+                    + "here. Please reinvite the bot "
                     + "or contact @{} for assistance"
                 ).format(owner.username),
-                components=_components_for_migration(bot),
             )
         except h.BadRequestError as e:
             owner = await bot.rest.fetch_user((await bot.fetch_owner_ids())[0])
@@ -232,7 +230,7 @@ class BaseChannelRecord:
                 e,
                 bot=bot,
                 mention_mods=True,
-                channel=cfg.alerts_channel_id,
+                channel=cfg.alerts_channel,
             )
 
     @classmethod

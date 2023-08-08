@@ -44,7 +44,7 @@ url_regex = re.compile(
 
 Base = declarative_base()
 db_engine = create_async_engine(
-    cfg.db_url_async, connect_args={"timeout": 120}, pool_pre_ping=True
+    cfg.legacy_db_url_async, connect_args={"timeout": 120}, pool_pre_ping=True
 )
 db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
 
@@ -134,40 +134,6 @@ async def follow_link_single_step(
                         return url
 
 
-def _embed_for_migration(original_embed: h.Embed):
-    return copy(original_embed).set_footer(
-        "Admins, please re-invite the bot before {} to continue receiving autoposts".format(
-            cfg.migration_deadline
-        )
-    )
-
-
-def _components_for_migration(bot: lb.BotApp):
-    view = m.View()
-    view.add_item(m.Button(url=cfg.migration_invite, label="Re-Invite"))
-    view.add_item(m.Button(url=cfg.migration_help, label="Help"))
-    return view
-
-
-async def _bot_has_webhook_perms(
-    bot: lb.BotApp,
-    channel_id: Union[h.GuildChannel, h.Snowflakeish],
-    skip_cache: bool = False,
-) -> bool:
-    if not skip_cache:
-        channel = bot.cache.get_guild_channel(channel_id)
-    else:
-        channel = None
-    if not channel:
-        channel = await bot.rest.fetch_channel(channel_id)
-    if not isinstance(channel, h.GuildChannel):
-        return False
-    bot_member = await bot.rest.fetch_member(channel.guild_id, bot.get_me())
-    return h.Permissions.MANAGE_WEBHOOKS in toolbox.calculate_permissions(
-        bot_member, channel
-    )
-
-
 @attr.s
 class MessageFailureError(Exception):
     channel_id: int = attr.ib()
@@ -179,7 +145,7 @@ async def send_message(
     bot: lb.BotApp, channel_id: int, message_kwargs: dict, crosspost: bool = True
 ) -> h.Message:
     try:
-        if cfg.single_server_mode and channel_id not in list(cfg.followables.values()):
+        if channel_id not in list(cfg.followables.values()):
             return
 
         try:

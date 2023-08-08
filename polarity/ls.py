@@ -280,7 +280,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
                     )
                     + f"\n"
                 ),
-                color=cfg.kyber_pink,
+                color=cfg.embed_default_color,
                 url="https://lostsectortoday.com/",
             )
             .add_field(
@@ -316,7 +316,7 @@ class LostSectorPostSettings(BasePostSettings, Base):
             embed2 = h.Embed(
                 title=secondary_embed_title,
                 description=secondary_embed_description,
-                color=cfg.kyber_pink,
+                color=cfg.embed_default_color,
             )
             embed2.set_image(secondary_image)
             embeds = [embed, embed2]
@@ -618,7 +618,7 @@ class LostSectors(AutopostsBase):
         except ValueError as err:
             await alert_owner(
                 err.args[0],
-                channel=cfg.alerts_channel_id,
+                channel=cfg.alerts_channel,
                 bot=event.bot,
                 mention_mods=True,
             )

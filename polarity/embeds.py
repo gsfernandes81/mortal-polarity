@@ -163,7 +163,7 @@ class EmbedBuilderView(InteractiveBuilderView):
         """Edits the embed's color"""
         embed = ctx.message.embeds[0]
         color = await self.ask_user_for_properties(
-            ctx, "Color", str(embed.color or cfg.kyber_pink), required=False
+            ctx, "Color", str(embed.color or cfg.embed_default_color), required=False
         )
         try:
             embed.color = h.Color.of(color)
@@ -276,7 +276,7 @@ async def build_embed_with_user(
     embed = existing_embed or h.Embed(
         title="Embed Builder",
         description="Use the buttons below to build your embed!\n",
-        color=cfg.kyber_pink,
+        color=cfg.embed_default_color,
     )
 
     view = EmbedBuilderView(done_button_text=done_button_text)

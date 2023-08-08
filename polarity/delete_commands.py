@@ -23,11 +23,11 @@ from . import cfg
 
 rest = h.RESTApp()
 
-TOKEN = cfg.main_token
+TOKEN = cfg.discord_token
 
 
 async def main():
-    async with rest.acquire(cfg.main_token, h.TokenType.BOT) as client:
+    async with rest.acquire(cfg.discord_token, h.TokenType.BOT) as client:
         application = await client.fetch_application()
 
         await client.set_application_commands(application.id, (), guild=h.UNDEFINED)

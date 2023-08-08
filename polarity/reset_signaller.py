@@ -43,7 +43,7 @@ PORT = cfg.port - 100
 # This will be useful when this is run in a single process
 # when apscheduler 4.x is released
 _scheduler = AsyncIOScheduler(
-    jobstores={"default": SQLAlchemyJobStore(url=cfg.db_url)},
+    jobstores={"default": SQLAlchemyJobStore(url=cfg.legacy_db_url)},
     job_defaults={
         "coalesce": "true",
         "misfire_grace_time": 1800,

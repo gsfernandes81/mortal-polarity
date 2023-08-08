@@ -162,7 +162,7 @@ class UrlPostSettings(BasePostSettings):
             title=self.embed_title.format(**format_dict),
             url=format_dict["post_url"],
             description=self.embed_description.format(**format_dict),
-            color=cfg.kyber_pink,
+            color=cfg.embed_default_color,
         ).set_image(format_dict["gfx_url"])
 
         if infographic:
@@ -222,7 +222,7 @@ class BaseUrlSignal(BaseCustomEvent):
             return
 
         # Debug code
-        if cfg.test_env and cfg.trigger_without_url_update:
+        if cfg.test_env:
             cls.dispatch_with(bot=event.app)
 
         await cls.wait_for_url_update()

@@ -14,148 +14,141 @@
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
 import abc
-import datetime as dt
 import json
 import typing as t
-from os import getenv as _getenv
+from os import getenv as __getenv
 
 import hikari as h
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
+def _getenv(var_name: str) -> str:
+    var = __getenv(var_name)
+    if var is None:
+        raise ValueError(f"Environment variable {var_name} not set")
+    else:
+        print(f"Loaded {var_name}")
+    return str(var)
+
+
+def _test_env(var_name: str) -> list[int] | bool:
+    test_env = _getenv(var_name) or "false"
+    test_env = test_env.lower()
+    test_env = (
+        [int(env.strip()) for env in test_env.split(",")]
+        if test_env != "false"
+        else False
+    )
+    return test_env
+
+
 def _lightbulb_params() -> dict:
-    intents = h.Intents.ALL_UNPRIVILEGED | h.Intents.MESSAGE_CONTENT
-    lightbulb_params = {
-        "token": discord_token,
-        "intents": intents,
-    }
-    # Only use the test env for testing if it is specified
+    lightbulb_params = {"token": discord_token}
     if test_env:
         lightbulb_params["default_enabled_guilds"] = test_env
     else:
-        # Test env isn't specified in production
-        lightbulb_params["default_enabled_guilds"] = []
+        lightbulb_params["default_enabled_guilds"] = [
+            kyber_discord_server_id,
+            control_discord_server_id,
+        ]
     return lightbulb_params
 
 
-# Discord API Token
-main_token = _getenv("MAIN_TOKEN")
-repeater_token = _getenv("MAIN_TOKEN")
+def _legacy_db_url(var_name: str) -> tuple[str, str]:
+    # Url for the bot and scheduler db
+    # SQAlchemy doesn't play well with postgres://, hence we replace
+    # it with postgresql://
+    legacy_db_url = _getenv(var_name)
+    if legacy_db_url.startswith("postgres"):
+        repl_till = legacy_db_url.find("://")
+        legacy_db_url = legacy_db_url[repl_till:]
+        legacy_db_url_async = "postgresql+asyncpg" + legacy_db_url
+        legacy_db_url = "postgresql" + legacy_db_url
+    return legacy_db_url, legacy_db_url_async
 
-single_server_mode = _getenv("SINGLE_SERVER_MODE") or "false"
-single_server_mode = (
-    True if single_server_mode and single_server_mode.lower() == "true" else False
-)
 
-# Url for the bot and scheduler db
-# SQAlchemy doesn't play well with postgres://, hence we replace
-# it with postgresql://
-db_url = _getenv("DATABASE_URL")
-if db_url.startswith("postgres"):
-    repl_till = db_url.find("://")
-    db_url = db_url[repl_till:]
-    db_url_async = "postgresql+asyncpg" + db_url
-    db_url = "postgresql" + db_url
+def _db_config():
+    # Async SQLAlchemy DB Session KWArg Parameters
+    db_session_kwargs = {"expire_on_commit": False, "class_": AsyncSession}
+    return db_session_kwargs
 
-# Async SQLAlchemy DB Session KWArg Parameters
-db_session_kwargs = {"expire_on_commit": False, "class_": AsyncSession}
 
-# Debug envs
-test_env = _getenv("TEST_ENV") or "false"
-test_env = (
-    [int(env.strip()) for env in test_env.split(",")] if test_env != "false" else False
-)
-trigger_without_url_update = _getenv("TRIGGER_WITHOUT_URL_UPDATE") or "false"
-trigger_without_url_update = (
-    True if trigger_without_url_update.lower() == "true" else False
-)
+def _sheets_credentials(
+    proj_id: str,
+    priv_key_id: str,
+    priv_key: str,
+    client_email: str,
+    client_id: str,
+    client_x509_cert_url: str,
+) -> dict[str, str]:
+    gsheets_credentials = {
+        "type": "service_account",
+        "project_id": _getenv(proj_id),
+        "private_key_id": _getenv(priv_key_id),
+        "private_key": _getenv(priv_key).replace("\\n", "\n"),
+        "client_email": _getenv(client_email),
+        "client_id": _getenv(client_id),
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": _getenv(client_x509_cert_url),
+    }
+    return gsheets_credentials
 
+
+###### Environment variables ######
+
+# Discord control server config
+control_discord_server_id = int(_getenv("CONTROL_DISCORD_SERVER_ID"))
+control_discord_role_id = int(_getenv("CONTROL_DISCORD_ROLE_ID"))
 admin_role = int(_getenv("ADMIN_ROLE"))
 admins = [int(admin.strip()) for admin in _getenv("ADMINS").split(",")]
-alerts_channel_id = int(_getenv("ALERTS_CHANNEL_ID"))
-
 kyber_discord_server_id = int(_getenv("KYBER_DISCORD_SERVER_ID"))
-control_discord_server_id = int(_getenv("CONTROL_DISCORD_SERVER_ID", default=0))
-control_discord_server_id = (
-    control_discord_server_id
-    if control_discord_server_id != 0
-    else kyber_discord_server_id
-)
+log_channel = int(_getenv("LOG_CHANNEL_ID"))
+alerts_channel = int(_getenv("ALERTS_CHANNEL_ID"))
 
-migration_deadline = str(_getenv("MIGRATION_DEADLINE"))
-migration_help = str(_getenv("MIGRATION_HELP"))
-migration_invite = str(_getenv("MIGRATION_INVITE"))
-disable_bad_channels = _getenv("DISABLE_BAD_CHANNELS").lower() == "true"
+# Discord environment config
+discord_token = _getenv("DISCORD_TOKEN")
+test_env = _test_env("TEST_ENV")
 
+# Discord constants
+embed_default_color = h.Color(int(_getenv("EMBED_DEFAULT_COLOR"), 16))
+embed_error_color = h.Color(int(_getenv("EMBED_ERROR_COLOR"), 16))
+emoji = json.loads(_getenv("EMOJI"))
 followables: t.Dict[str, int] = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
 
+# Database URLs
+legacy_db_url, legacy_db_url_async = _legacy_db_url("DATABASE_URL")
+
+# Sheets credentials & URLs
+gsheets_credentials = _sheets_credentials(
+    "SHEETS_PROJECT_ID",
+    "SHEETS_PRIVATE_KEY_ID",
+    "SHEETS_PRIVATE_KEY",
+    "SHEETS_CLIENT_EMAIL",
+    "SHEETS_CLIENT_ID",
+    "SHEETS_CLIENT_X509_CERT_URL",
+)
+sheets_ls_url = _getenv("SHEETS_LS_URL")
+
+# Twitter credentials
 tw_cons_key = str(_getenv("TWITTER_CONSUMER_KEY"))
 tw_cons_secret = str(_getenv("TWITTER_CONSUMER_SECRET"))
 tw_access_tok = str(_getenv("TWITTER_ACCESS_TOKEN"))
 tw_access_tok_secret = str(_getenv("TWITTER_ACCESS_TOKEN_SECRET"))
 tw_bearer_tok = str(_getenv("TWITTER_BEARER_TOKEN"))
 
-
-lightbulb_params = (
-    # Only use the test env for testing if it is specified
-    {"token": main_token, "default_enabled_guilds": test_env}
-    if test_env
-    else {"token": main_token}  # Test env isn't specified in production
-)
-
-lightbulb_params = {"token": main_token}
-if test_env:
-    lightbulb_params["default_enabled_guilds"] = test_env
-elif single_server_mode:
-    lightbulb_params["default_enabled_guilds"] = [
-        kyber_discord_server_id,
-        control_discord_server_id,
-    ]
-
-gsheets_credentials = {
-    "type": "service_account",
-    "project_id": _getenv("SHEETS_PROJECT_ID"),
-    "private_key_id": _getenv("SHEETS_PRIVATE_KEY_ID"),
-    "private_key": _getenv("SHEETS_PRIVATE_KEY").replace("\\n", "\n"),
-    "client_email": _getenv("SHEETS_CLIENT_EMAIL"),
-    "client_id": _getenv("SHEETS_CLIENT_ID"),
-    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-    "token_uri": "https://oauth2.googleapis.com/token",
-    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-    "client_x509_cert_url": _getenv("SHEETS_CLIENT_X509_CERT_URL"),
-}
-
-sheets_ls_url = _getenv("SHEETS_LS_URL")
-
+# Listening port
 port = int(_getenv("PORT") or 5000)
-
-kyber_pink = h.Color(0xEC42A5)
-
-###### Environment variables ######
-
-# Discord environment config
-discord_token = _getenv("DISCORD_TOKEN")
-
-# Discord constants
-embed_default_color = h.Color(int(_getenv("EMBED_DEFAULT_COLOR"), 16))
-embed_error_color = h.Color(int(_getenv("EMBED_ERROR_COLOR"), 16))
-emoji = json.loads(_getenv("EMOJI"))
-followables = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
-default_url = _getenv("DEFAULT_URL")
-
-# Discord control server config
-control_discord_server_id = int(_getenv("CONTROL_DISCORD_SERVER_ID"))
-control_discord_role_id = int(_getenv("CONTROL_DISCORD_ROLE_ID"))
-kyber_discord_server_id = int(_getenv("KYBER_DISCORD_SERVER_ID"))
-log_channel = int(_getenv("LOG_CHANNEL_ID"))
-alerts_channel = int(_getenv("ALERTS_CHANNEL_ID"))
-
 
 #### Environment variables end ####
 
 ###################################
 
 ####### Configs & constants #######
+
+db_session_kwargs = _db_config()
+lightbulb_params = _lightbulb_params()
 
 
 class defaults(abc.ABC):
@@ -167,9 +160,5 @@ class defaults(abc.ABC):
         gfx_url = "https://kyber3000.com/Reset"
         post_url = "https://kyber3000.com/Resetpost"
 
-
-# db_session_kwargs, db_session_kwargs_sync, db_connect_args = _db_config()
-lightbulb_params = _lightbulb_params()
-reset_time_tolerance = dt.timedelta(minutes=60)
 
 ##### Configs & constants end #####

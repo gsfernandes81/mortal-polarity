@@ -67,7 +67,7 @@ def run_migrations_offline() -> None:
     """
 
     context.configure(
-        url=cfg.db_url_async,
+        url=cfg.legacy_db_url_async,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -93,7 +93,7 @@ async def run_migrations_online() -> None:
 
     """
     config_ = config.get_section(config.config_ini_section)
-    config_["sqlalchemy.url"] = cfg.db_url_async
+    config_["sqlalchemy.url"] = cfg.legacy_db_url_async
     connectable = AsyncEngine(
         engine_from_config(
             config_,
