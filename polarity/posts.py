@@ -35,6 +35,9 @@ async def post_group(ctx: lb.Context):
 @lb.command("create", "Create a new post", hidden=True, ephemeral=True)
 @lb.implements(lb.SlashSubCommand)
 async def create_post(ctx: lb.Context):
+    if not ctx.author.id in cfg.admins:
+        return await ctx.respond("You are not an admin")
+
     embed = await build_embed_with_user(ctx, done_button_text="Post")
     await ctx.get_channel().send(embed)
 
