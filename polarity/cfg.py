@@ -22,9 +22,12 @@ import hikari as h
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-def _getenv(var_name: str) -> str:
+def _getenv(var_name: str, default: t.Optional[str] = None) -> str:
     var = __getenv(var_name)
     if var is None:
+        if default is not None:
+            print(f"Loaded {var_name} with default value {default}")
+            return default
         raise ValueError(f"Environment variable {var_name} not set")
     else:
         print(f"Loaded {var_name}")
@@ -32,7 +35,7 @@ def _getenv(var_name: str) -> str:
 
 
 def _test_env(var_name: str) -> list[int] | bool:
-    test_env = _getenv(var_name) or "false"
+    test_env = _getenv(var_name, default="false")
     test_env = test_env.lower()
     test_env = (
         [int(env.strip()) for env in test_env.split(",")]
