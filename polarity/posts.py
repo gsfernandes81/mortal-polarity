@@ -83,9 +83,6 @@ async def copy_post(ctx: lb.MessageContext):
 
     message: h.Message = ctx.options.target
 
-    if not message.author.id == ctx.bot.get_me().id:
-        return await ctx.respond("Can only edit messages posted by this bot")
-
     if not (message.embeds and len(message.embeds) == 1):
         return await ctx.respond("Can only edit messages with 1 embed")
 
