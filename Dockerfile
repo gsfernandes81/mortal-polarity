@@ -29,7 +29,6 @@ COPY --from=builder /venv /venv
 COPY --from=builder /app/dist .
 COPY docker-entrypoint.sh ./
 COPY Procfile ./
-COPY Procfile.release ./
 
 RUN . /venv/bin/activate && pip install *.whl
 CMD ["sh", "docker-entrypoint.sh"]

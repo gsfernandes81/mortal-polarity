@@ -19,10 +19,14 @@ import lightbulb as lb
 
 from . import cfg
 
+control_group_name = "ddv1"
+if cfg.test_env:
+    control_group_name = "dev_ddv1"
+
 
 @lb.add_checks(lb.checks.has_roles(cfg.control_discord_role_id))
 @lb.command(
-    "kyber",
+    control_group_name,
     "Commands for Kyber",
     guilds=[
         cfg.control_discord_server_id,

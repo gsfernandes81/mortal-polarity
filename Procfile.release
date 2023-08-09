@@ -1,1 +1,0 @@
-release: cd polarity && alembic upgrade head && cd .. && python -OO -m polarity.release

@@ -1173,25 +1173,6 @@ files = [
 ]
 
 [[package]]
-name = "lightbulb-ext-wtf"
-version = "0.1.1"
-description = "A very strange method of declaring commands with hikari-lightbulb"
-category = "main"
-optional = false
-python-versions = ">=3.8.0,<3.12"
-files = []
-develop = false
-
-[package.dependencies]
-hikari-lightbulb = ">=2.1.0"
-
-[package.source]
-type = "git"
-url = "https://github.com/gs729/lightbulb-ext-wtf.git"
-reference = "24a7dd2"
-resolved_reference = "24a7dd2605552ae3a77dfefa42eb0a8e3520fc91"
-
-[[package]]
 name = "mako"
 version = "1.2.4"
 description = "A super-fast templating language that borrows the best ideas from the existing templating languages."
@@ -2409,4 +2390,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.11.0"
-content-hash = "e18f9243b196db530a8573ca633e4b175961c35754312920422e3f0516a6ebb0"
+content-hash = "79c9b28ad8bf433ccca79593390659f5138c62dd9b8e2e64b2ca93c7669d2fc0"

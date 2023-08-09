@@ -13,24 +13,22 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio
+import asyncio as aio
 import concurrent.futures
 import contextlib
 import datetime as dt
 import functools
 import logging
 import re
-from copy import copy
-from typing import List, Tuple, Union
+import typing as t
 
 import aiofiles
 import aiohttp
 import attr
 import hikari as h
 import lightbulb as lb
-import miru as m
-import toolbox
 import yarl
+from hmessage import HMessage
 from pytz import utc
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -79,7 +77,7 @@ def operation_timer(op_name, logger=logging.getLogger("main/" + __name__)):
     )
 
 
-def weekend_period(today: dt.datetime = None) -> Tuple[dt.datetime, dt.datetime]:
+def weekend_period(today: dt.datetime = None) -> t.Tuple[dt.datetime, dt.datetime]:
     if today is None:
         today = dt.datetime.now()
     today = dt.datetime(today.year, today.month, today.day, tzinfo=utc)
@@ -90,7 +88,7 @@ def weekend_period(today: dt.datetime = None) -> Tuple[dt.datetime, dt.datetime]
     return friday, tuesday
 
 
-def week_period(today: dt.datetime = None) -> Tuple[dt.datetime, dt.datetime]:
+def week_period(today: dt.datetime = None) -> t.Tuple[dt.datetime, dt.datetime]:
     if today is None:
         today = dt.datetime.now()
     today = dt.datetime(today.year, today.month, today.day, tzinfo=utc)
@@ -100,7 +98,7 @@ def week_period(today: dt.datetime = None) -> Tuple[dt.datetime, dt.datetime]:
     return start, end
 
 
-def day_period(today: dt.datetime = None) -> Tuple[dt.datetime, dt.datetime]:
+def day_period(today: dt.datetime = None) -> t.Tuple[dt.datetime, dt.datetime]:
     if today is None:
         today = dt.datetime.now()
     today = dt.datetime(today.year, today.month, today.day, 17, tzinfo=utc)
@@ -128,7 +126,7 @@ async def follow_link_single_step(
                         )
                         if i < retries - 1:
                             logger.error("Retrying...")
-                        await asyncio.sleep(retry_delay)
+                        await aio.sleep(retry_delay)
                         continue
                     else:
                         return url
@@ -142,63 +140,53 @@ class MessageFailureError(Exception):
 
 
 async def send_message(
-    bot: lb.BotApp, channel_id: int, message_kwargs: dict, crosspost: bool = True
+    bot: lb.BotApp, msg_proto: HMessage, crosspost: bool = True
 ) -> h.Message:
-    try:
-        if channel_id not in list(cfg.followables.values()):
-            return
-
+    channel = cfg.followables["lost_sector"]
+    send_backoff = 10
+    while True:
         try:
-            channel = bot.cache.get_guild_channel(
-                channel_id
-            ) or await bot.rest.fetch_channel(channel_id)
-        except:
-            return
+            channel: h.TextableGuildChannel = bot.cache.get_guild_channel(
+                channel
+            ) or await bot.rest.fetch_channel(channel)
+            msg_proto = await channel.send(**msg_proto.to_message_kwargs())
+        except Exception as e:
+            e.add_note("Failed to send lost sector with exception\n")
+            logging.exception(e)
+            await aio.sleep(send_backoff)
+            send_backoff = send_backoff * 2
+        else:
+            break
 
-        message = await channel.send(**message_kwargs)
+    if not crosspost:
+        return
 
-        if crosspost and isinstance(channel, h.GuildNewsChannel):
-            for i in range(10):
-                try:
-                    await bot.rest.crosspost_message(channel, message)
-                except BaseException as e:
-                    success = False
-                    logging.exception(e)
-                    await asyncio.sleep(i)
-                else:
-                    success = True
-                    break
+    if not isinstance(channel, h.GuildNewsChannel):
+        return
 
-            if not success:
-                logging.error("FAILED TO CROSSPOST WITH EXCEPTION:")
-                logging.exception(e)
+    # If the channel is a news channel then crosspost the message as well
+    crosspost_backoff = 30
+    while True:
+        try:
+            await bot.rest.crosspost_message(channel.id, msg_proto.id)
+        except Exception as e:
+            if (
+                isinstance(e, h.BadRequestError)
+                and "This message has already been crossposted" in e.message
+            ):
+                # If the message has already been crossposted
+                # then we can ignore the error
+                break
 
-    except Exception as e:
-        raise MessageFailureError(channel_id, message_kwargs, e)
-    else:
-        return message
-
-
-async def _edit_message(
-    message_id: int,
-    channel_id: int,
-    bot: h.GatewayBot,
-    message_kwargs: dict,
-    logger=logging.getLogger("main/" + __name__),
-) -> None:
-    try:
-        if channel_id not in list(cfg.followables.values()):
-            return
-        msg: h.Message = bot.cache.get_message(
-            message_id
-        ) or await bot.rest.fetch_message(channel_id, message_id)
-
-        await msg.edit(**message_kwargs)
-    except (h.ForbiddenError, h.NotFoundError):
-        logger.warning("Message {} not found or not editable".format(message_id))
+            e.add_note(f"Failed to publish lost sector with exception\n")
+            logging.exception(e)
+            await aio.sleep(crosspost_backoff)
+            crosspost_backoff = crosspost_backoff * 2
+        else:
+            break
 
 
-async def _download_linked_image(url: str) -> Union[str, None]:
+async def download_linked_image(url: str) -> t.Union[str, None]:
     # Returns the name of the downloaded image
     # Throws an aiohttp.client_exceptions.InvalidURL on
     # an invalid url
@@ -217,7 +205,7 @@ async def _download_linked_image(url: str) -> Union[str, None]:
                         await f.close()
                         return name
                     else:
-                        await asyncio.sleep(backoff_timer)
+                        await aio.sleep(backoff_timer)
                         backoff_timer = backoff_timer + (1 / backoff_timer)
         except aiohttp.InvalidURL:
             return None
@@ -227,11 +215,11 @@ def _get_uri_name(url: str) -> str:
     return yarl.URL(url).name
 
 
-async def _run_in_thread_pool(func, *args, **kwargs):
+async def run_in_thread_pool(func, *args, **kwargs):
     # Apply arguments without executing with functools partial
     partial_func = functools.partial(func, *args, **kwargs)
     # Execute in thread pool
-    future = asyncio.get_event_loop().run_in_executor(
+    future = aio.get_event_loop().run_in_executor(
         concurrent.futures.ThreadPoolExecutor(), partial_func
     )
     await future
@@ -243,8 +231,8 @@ async def _run_in_thread_pool(func, *args, **kwargs):
 async def alert_owner(
     *args: str,
     bot: lb.BotApp = None,
-    channel: Union[None, int, h.TextableChannel],
-    mention_mods: bool = True
+    channel: t.Union[None, int, h.TextableChannel],
+    mention_mods: bool = True,
 ):
     # Sends an alert in the specified channels
     # logs the same alert
@@ -273,7 +261,7 @@ async def alert_owner(
     await channel.send(alert, role_mentions=True)
 
 
-def endl(*args: List[str]) -> str:
+def endl(*args: t.List[str]) -> str:
     # Returns a string with each argument separated by a newline
     return "\n".join([str(arg) for arg in args])
 
@@ -293,3 +281,13 @@ class space:
 
 def followable_name(*, id: int):
     return next(key for key, value in cfg.followables.items() if value == id)
+
+
+def check_admin(func):
+    async def wrapper(ctx: lb.Context):
+        if ctx.author.id not in cfg.admins:
+            await ctx.respond("Only admins can use this command")
+            return
+        return await func(ctx)
+
+    return wrapper

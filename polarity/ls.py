@@ -13,46 +13,24 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
+import asyncio as aio
 import datetime as dt
-import functools
 import logging
-from asyncio import sleep
-from calendar import month_name as month
-from typing import List, Tuple, Type
-from random import randint
+import typing as t
 
-import aiohttp
 import hikari as h
 import lightbulb as lb
 import tweepy
-from lightbulb.ext import tasks, wtf
-from pytz import utc
-from sector_accounting import Rotation, Sector
-from sector_accounting.sector_accounting import DifficultySpecificSectorData
-from sqlalchemy import select
+from aiohttp import InvalidURL
 from hmessage import HMessage
+from pytz import utc
+from sector_accounting.sector_accounting import (
+    DifficultySpecificSectorData,
+    Rotation,
+    Sector,
+)
 
-from . import cfg
-from .autopost import (
-    AutopostsBase,
-    BaseChannelRecord,
-    BaseCustomEvent,
-    BasePostSettings,
-    DailyResetSignal,
-)
-from .utils import (
-    Base,
-    _create_or_get,
-    _download_linked_image,
-    _edit_message,
-    _run_in_thread_pool,
-    alert_owner,
-    db_session,
-    endl,
-    follow_link_single_step,
-    operation_timer,
-    space,
-)
+from . import autopost, cfg, controller, utils
 
 logger = logging.getLogger(__name__)
 
@@ -70,27 +48,21 @@ LOCATION_EMOJI = "<:location:1086525796031676556>"
 EXOTIC_ENGRAM_EMOJI = "<:exotic_engram:849898122083434506>"
 
 
-ROTATION_UPDATE_INTERVAL = 60
-
-rotation_global = None
-
-
-@tasks.task(
-    s=ROTATION_UPDATE_INTERVAL,
-    auto_start=True,
-    wait_before_execution=False,
+twitter_ls_post_string = utils.endl(
+    "Lost Sector Today",
+    "",
+    "🗺️ {sector.name}",
+    "🏆 Exotic {sector.reward}",
+    "",
+    "👹 {sector.champions}",
+    "🛡️ {sector.shields}",
+    "☢️ {sector.burn} Threat",
+    "{weapon_emoji} {sector.overcharged_weapon} Overcharge",
+    "💪 {sector.surge} Surge",
+    "🛠️ {sector.modifiers}",
+    "",
+    "🔗 lostsectortoday.com",
 )
-async def rotation_update_task():
-    global rotation_global
-    try:
-        # Introduce a 5% jitter to the update interval
-        # to avoid potential ratelimit issues
-        await sleep(randint(0, int(ROTATION_UPDATE_INTERVAL / 20)))
-        rotation_global = Rotation.from_gspread_url(
-            cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=5
-        )
-    except Exception as e:
-        logging.error(e)
 
 
 def _fmt_count(emoji: str, count: int, width: int) -> str:
@@ -103,7 +75,7 @@ def _fmt_count(emoji: str, count: int, width: int) -> str:
         return ""
 
 
-def format_sector_data_for_discord(
+def format_counts(
     legend_data: DifficultySpecificSectorData, master_data: DifficultySpecificSectorData
 ) -> str:
     len_bar = len(
@@ -140,7 +112,7 @@ def format_sector_data_for_discord(
     data_strings = []
 
     for data in [legend_data, master_data]:
-        champs_string = space.figure.join(
+        champs_string = utils.space.figure.join(
             filter(
                 None,
                 [
@@ -152,7 +124,7 @@ def format_sector_data_for_discord(
                 ],
             )
         )
-        shields_string = space.figure.join(
+        shields_string = utils.space.figure.join(
             filter(
                 None,
                 [
@@ -164,7 +136,7 @@ def format_sector_data_for_discord(
                 ],
             )
         )
-        data_string = f"{space.figure}|{space.figure}".join(
+        data_string = f"{utils.space.figure}|{utils.space.figure}".join(
             filter(
                 None,
                 [
@@ -176,220 +148,175 @@ def format_sector_data_for_discord(
         data_strings.append(data_string)
 
     return (
-        f"Legend:{space.figure}"
+        f"Legend:{utils.space.figure}"
         + data_strings[0]
-        + f"\nMaster:{space.hair}{space.figure}"
+        + f"\nMaster:{utils.space.hair}{utils.space.figure}"
         + data_strings[1]
     )
 
 
-class LostSectorPostSettings(BasePostSettings, Base):
-    twitter_ls_post_string = endl(
-        "Lost Sector Today",
-        "",
-        "🗺️ {sector.name}",
-        "🏆 Exotic {sector.reward}",
-        "",
-        "👹 {sector.champions}",
-        "🛡️ {sector.shields}",
-        "☢️ {sector.burn} Threat",
-        "{weapon_emoji} {sector.overcharged_weapon} Overcharge",
-        "💪 {sector.surge} Surge",
-        "🛠️ {sector.modifiers}",
-        "",
-        "🔗 lostsectortoday.com",
+async def format_sector(
+    date: dt.date = None,
+    thumbnail: h.Attachment = None,
+    secondary_image: h.Attachment = None,
+    secondary_embed_title: str = "",
+    secondary_embed_description: str = "",
+) -> HMessage:
+    buffer = 1  # Minute
+    if date is None:
+        date = dt.datetime.now(tz=utc) - dt.timedelta(hours=16, minutes=60 - buffer)
+    else:
+        date = date + dt.timedelta(minutes=buffer)
+    sector: Sector = Rotation.from_gspread_url(
+        cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=5
+    )()
+
+    # Follow the hyperlink to have the newest image embedded
+    try:
+        ls_gfx_url = await utils.follow_link_single_step(sector.shortlink_gfx)
+    except InvalidURL:
+        ls_gfx_url = None
+
+    # Surges to emojis
+    _surges = [surge.lower() for surge in sector.surges]
+    surges = []
+    if "solar" in _surges:
+        surges += [SOLAR_EMOJI]
+    if "arc" in _surges:
+        surges += [ARC_EMOJI]
+    if "void" in _surges:
+        surges += [VOID_EMOJI]
+    if "stasis" in _surges:
+        surges += [STASIS_EMOJI]
+    if "strand" in _surges:
+        surges += [STRAND_EMOJI]
+
+    # Threat to emoji
+    threat = sector.threat.lower()
+    if threat == "solar":
+        threat = SOLAR_EMOJI
+    elif threat == "arc":
+        threat = ARC_EMOJI
+    elif threat == "void":
+        threat = VOID_EMOJI
+    elif threat == "stasis":
+        threat = STASIS_EMOJI
+    elif threat == "strand":
+        threat = STRAND_EMOJI
+
+    overcharged_weapon_emoji = (
+        "⚔️" if sector.overcharged_weapon.lower() in ["sword", "glaive"] else "🔫"
     )
 
-    @classmethod
-    def format_twitter_post(cls, sector: Sector):
-        weapon_emoji = (
-            "⚔️" if sector.overcharged_weapon.lower() in ["sword", "glaive"] else "🔫"
-        )
-        return cls.twitter_ls_post_string.format(
-            sector=sector, weapon_emoji=weapon_emoji
-        )
+    if "(" in sector.name or ")" in sector.name:
+        sector_name = sector.name.split("(")[0].strip()
+        sector_location = sector.name.split("(")[1].split(")")[0].strip()
+    else:
+        sector_name = sector.name
+        sector_location = None
 
-    async def get_announce_message(
-        self,
-        date: dt.date = None,
-        thumbnail: h.Attachment = None,
-        secondary_image: h.Attachment = None,
-        secondary_embed_title: str = "",
-        secondary_embed_description: str = "",
-    ) -> h.Embed:
-        buffer = 1  # Minute
-        if date is None:
-            date = dt.datetime.now(tz=utc) - dt.timedelta(hours=16, minutes=60 - buffer)
-        else:
-            date = date + dt.timedelta(minutes=buffer)
-        sector: Sector = rotation_global()
-
-        # Follow the hyperlink to have the newest image embedded
-        try:
-            ls_gfx_url = await follow_link_single_step(sector.shortlink_gfx)
-        except aiohttp.InvalidURL:
-            ls_gfx_url = None
-
-        # Surges to emojis
-        _surges = [surge.lower() for surge in sector.surges]
-        surges = []
-        if "solar" in _surges:
-            surges += [SOLAR_EMOJI]
-        if "arc" in _surges:
-            surges += [ARC_EMOJI]
-        if "void" in _surges:
-            surges += [VOID_EMOJI]
-        if "stasis" in _surges:
-            surges += [STASIS_EMOJI]
-        if "strand" in _surges:
-            surges += [STRAND_EMOJI]
-
-        # Threat to emoji
-        threat = sector.threat.lower()
-        if threat == "solar":
-            threat = SOLAR_EMOJI
-        elif threat == "arc":
-            threat = ARC_EMOJI
-        elif threat == "void":
-            threat = VOID_EMOJI
-        elif threat == "stasis":
-            threat = STASIS_EMOJI
-        elif threat == "strand":
-            threat = STRAND_EMOJI
-
-        overcharged_weapon_emoji = (
-            "⚔️" if sector.overcharged_weapon.lower() in ["sword", "glaive"] else "🔫"
-        )
-
-        if "(" in sector.name or ")" in sector.name:
-            sector_name = sector.name.split("(")[0].strip()
-            sector_location = sector.name.split("(")[1].split(")")[0].strip()
-        else:
-            sector_name = sector.name
-            sector_location = None
-
-        embed = (
-            h.Embed(
-                title="**Lost Sector Today**",
-                description=(
-                    f"{LS_EMOJI}{space.three_per_em}{sector_name}\n"
-                    + (
-                        f"{LOCATION_EMOJI}{space.three_per_em}{sector_location}\n"
-                        if sector_location
-                        else ""
-                    )
-                    + f"\n"
-                ),
-                color=cfg.embed_default_color,
-                url="https://lostsectortoday.com/",
-            )
-            .add_field(
-                name=f"Reward",
-                value=f"{EXOTIC_ENGRAM_EMOJI}{space.three_per_em}Exotic {sector.reward} (If-Solo)",
-            )
-            .add_field(
-                name=f"Champs and Shields",
-                value=format_sector_data_for_discord(
-                    sector.legend_data, sector.master_data
-                ),
-            )
-            .add_field(
-                name=f"Elementals",
-                value=f"Surge: {space.punctuation}{space.hair}{space.hair}"
-                + " ".join(surges)
-                + f"\nThreat: {threat}",
-            )
-            .add_field(
-                name=f"Modifiers",
-                value=f"{SWORDS_EMOJI}{space.three_per_em}{sector.to_sector_v1().modifiers}"
-                + f"\n{overcharged_weapon_emoji}{space.three_per_em}Overcharged {sector.overcharged_weapon}",
-            )
-        )
-
-        if ls_gfx_url:
-            embed.set_image(ls_gfx_url)
-
-        if thumbnail:
-            embed.set_thumbnail(thumbnail)
-
-        if secondary_image:
-            embed2 = h.Embed(
-                title=secondary_embed_title,
-                description=secondary_embed_description,
-                color=cfg.embed_default_color,
-            )
-            embed2.set_image(secondary_image)
-            embeds = [embed, embed2]
-        else:
-            embeds = [embed]
-
-        return HMessage(embeds=embeds)
-
-    async def get_twitter_data_tuple(self, date: dt.date = None) -> Tuple[str, str]:
-        date = date or dt.datetime.now(tz=utc)
-        rot = Rotation.from_gspread_url(
-            cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=1  # minutes
-        )().to_sector_v1()
-        return (
-            self.format_twitter_post(rot),
-            await _download_linked_image(rot.shortlink_gfx),
-        )
-
-
-class LostSectorAutopostChannel(BaseChannelRecord, Base):
-    settings_records: Type[BasePostSettings] = LostSectorPostSettings
-    follow_channel = cfg.followables["lost_sector"]
-    autopost_friendly_name = "Lost sector autoposts"
-
-    @classmethod
-    def register(
-        cls,
-        bot: lb.BotApp,
-        cmd_group: lb.SlashCommandGroup,
-        announce_event: Type[h.Event],
-    ):
-        cls.control_command_name = "lost sector"
-
-        @cmd_group.child
-        @lb.app_command_permissions(dm_enabled=False)
-        @lb.command("lost", "Lost sector autoposts", inherit_checks=True)
-        @lb.implements(lb.SlashSubGroup)
-        async def lost(ctx: lb.Context) -> None:
-            pass
-
-        lost.child(
-            lb.app_command_permissions(dm_enabled=False)(
-                lb.option(
-                    "option",
-                    "Enabled or disabled",
-                    type=str,
-                    choices=["Enable", "Disable"],
-                    required=True,
-                )(
-                    lb.command(
-                        "sector",
-                        "{} auto posts".format(cls.control_command_name.capitalize()),
-                        auto_defer=True,
-                        guilds=cfg.control_discord_server_id,
-                        inherit_checks=True,
-                    )(
-                        lb.implements(lb.SlashSubCommand)(
-                            functools.partial(cls.autopost_ctrl_usr_cmd, cls)
-                        )
-                    )
+    embed = (
+        h.Embed(
+            title="**Lost Sector Today**",
+            description=(
+                f"{LS_EMOJI}{utils.space.three_per_em}{sector_name}\n"
+                + (
+                    f"{LOCATION_EMOJI}{utils.space.three_per_em}{sector_location}\n"
+                    if sector_location
+                    else ""
                 )
-            )
+                + f"\n"
+            ),
+            color=cfg.embed_default_color,
+            url="https://lostsectortoday.com/",
         )
+        .add_field(
+            name=f"Reward",
+            value=f"{EXOTIC_ENGRAM_EMOJI}{utils.space.three_per_em}Exotic {sector.reward} (If-Solo)",
+        )
+        .add_field(
+            name=f"Champs and Shields",
+            value=format_counts(sector.legend_data, sector.master_data),
+        )
+        .add_field(
+            name=f"Elementals",
+            value=f"Surge: {utils.space.punctuation}{utils.space.hair}{utils.space.hair}"
+            + " ".join(surges)
+            + f"\nThreat: {threat}",
+        )
+        .add_field(
+            name=f"Modifiers",
+            value=f"{SWORDS_EMOJI}{utils.space.three_per_em}{sector.to_sector_v1().modifiers}"
+            + f"\n{overcharged_weapon_emoji}{utils.space.three_per_em}Overcharged {sector.overcharged_weapon}",
+        )
+    )
 
-        bot.listen(announce_event)(cls.announcer)
+    if ls_gfx_url:
+        embed.set_image(ls_gfx_url)
+
+    if thumbnail:
+        embed.set_thumbnail(thumbnail)
+
+    if secondary_image:
+        embed2 = h.Embed(
+            title=secondary_embed_title,
+            description=secondary_embed_description,
+            color=cfg.embed_default_color,
+        )
+        embed2.set_image(secondary_image)
+        embeds = [embed, embed2]
+    else:
+        embeds = [embed]
+
+    return HMessage(embeds=embeds)
 
 
-class LostSectorSignal(BaseCustomEvent):
+def format_twitter_post(sector: Sector):
+    weapon_emoji = (
+        "⚔️" if sector.overcharged_weapon.lower() in ["sword", "glaive"] else "🔫"
+    )
+    return twitter_ls_post_string.format(sector=sector, weapon_emoji=weapon_emoji)
+
+
+async def get_twitter_data_tuple(date: dt.date = None) -> t.Tuple[str, str]:
+    date = date or dt.datetime.now(tz=utc)
+    rot = Rotation.from_gspread_url(
+        cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=1  # minutes
+    )().to_sector_v1()
+    return (
+        format_twitter_post(rot),
+        await utils.download_linked_image(rot.shortlink_gfx),
+    )
+
+
+class LostSectorPostSettings(autopost.BasePostSettings):
+    pass
+
+
+async def announcer(event):
+    bot: lb.BotApp = event.app
+    logger.info("Announcing lost sector")
+
+    while True:
+        retries = 0
+        try:
+            hmessage = await format_sector()
+        except Exception as e:
+            logger.exception(e)
+            aio.sleep(2**retries)
+        else:
+            break
+    await utils.send_message(bot, hmessage, crosspost=True)
+
+
+class LostSectorSignal(autopost.BaseCustomEvent):
     # Whether bot listen has been called on conditional_reset_repeater
     _signal_linked: bool = False
 
     @classmethod
-    async def conditional_daily_reset_repeater(cls, event: DailyResetSignal) -> None:
+    async def conditional_daily_reset_repeater(
+        cls, event: autopost.DailyResetSignal
+    ) -> None:
         """Dispatched self if autoannounces are enabled in the settings object"""
         if await cls.is_autoannounce_enabled():
             cls.dispatch_with(bot=event.app)
@@ -397,7 +324,7 @@ class LostSectorSignal(BaseCustomEvent):
     @classmethod
     async def is_autoannounce_enabled(cls):
         """Checks if autoannounces are enabled in the settings object"""
-        settings = await _create_or_get(
+        settings = await utils._create_or_get(
             LostSectorPostSettings, 0, autoannounce_enabled=True
         )
         return settings.autoannounce_enabled
@@ -411,19 +338,34 @@ class LostSectorSignal(BaseCustomEvent):
         return self
 
 
-class LostSectorTwitterSignal(BaseCustomEvent):
+class LostSectorTwitterSignal(autopost.BaseCustomEvent):
     "Signal to trigger a twitter specific lost sector post"
     pass
 
 
-class LostSectorDiscordSignal(BaseCustomEvent):
+class LostSectorDiscordSignal(autopost.BaseCustomEvent):
     "Signal to trigger a discord specific lost sector post"
     pass
 
 
+@lb.command(
+    "ls", "Lost sector announcement management", guilds=[cfg.control_discord_server_id]
+)
+@lb.implements(lb.SlashSubGroup)
+def ls_group():
+    pass
+
+
+@ls_group.child
+@lb.option(
+    "option", "Enable or disable", str, choices=["Enable", "Disable"], required=True
+)
+@lb.command("autoposts", "Enable or disable automatic announcements", auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+@utils.check_admin
 async def ls_control(ctx: lb.Context):
     option = True if ctx.options.option.lower() == "enable" else False
-    async with db_session() as session:
+    async with utils.db_session() as session:
         async with session.begin():
             settings = await session.get(LostSectorPostSettings, 0)
             if settings is None:
@@ -436,27 +378,64 @@ async def ls_control(ctx: lb.Context):
     )
 
 
+@ls_group.child
+@lb.command("announce", "Trigger an announcement manually", auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+@utils.check_admin
 async def ls_announce(ctx: lb.Context):
     await ctx.respond("Announcing now")
     LostSectorSignal.dispatch_with(bot=ctx.bot)
 
 
+@ls_group.child
+@lb.command(
+    "announce_twitter", "Trigger a twitter announcement manually", auto_defer=True
+)
+@lb.implements(lb.SlashSubCommand)
+@utils.check_admin
 async def ls_twitter_announce(ctx: lb.Context):
     await ctx.respond("Announcing to twitter now")
     LostSectorTwitterSignal.dispatch_with(bot=ctx.bot)
 
 
+@ls_group.child
+@lb.command(
+    "announce_discord", "Trigger a discord announcement manually", auto_defer=True
+)
+@lb.implements(lb.SlashSubCommand)
+@utils.check_admin
 async def ls_discord_announce(ctx: lb.Context):
     await ctx.respond("Announcing to discord now")
     LostSectorDiscordSignal.dispatch_with(bot=ctx.bot)
 
 
-class LostSectors(AutopostsBase):
+@lb.command("ls_update", "Update a lost sector post", ephemeral=True, auto_defer=True)
+@lb.implements(lb.MessageCommand)
+async def ls_update(ctx: lb.MessageContext):
+    """Correct a mistake in the lost sector announcement"""
+
+    if ctx.author.id not in cfg.admins:
+        await ctx.respond("Only admins can use this command")
+        return
+
+    msg_to_update: h.Message = ctx.options.target
+
+    async with utils.db_session() as session:
+        settings: LostSectorPostSettings = await session.get(LostSectorPostSettings, 0)
+        if settings is None:
+            await ctx.respond("Please enable autoposts before using this cmd")
+
+        logger.info("Correcting posts")
+
+        await ctx.edit_last_response("Updating post now")
+        message = await settings.get_announce_message()
+        message.embeds[0].title = "TEST"
+        await msg_to_update.edit(**message.to_message_kwargs())
+        await ctx.edit_last_response("Post updated")
+
+
+class TwitterHandler:
     def __init__(self):
-        super().__init__()
-        self.settings_table = LostSectorPostSettings
-        self.autopost_channel_table = LostSectorAutopostChannel
-        # Create the twitter object:
         self._twitter = tweepy.API(
             tweepy.OAuth1UserHandler(
                 cfg.tw_cons_key,
@@ -473,150 +452,16 @@ class LostSectors(AutopostsBase):
             cfg.tw_access_tok_secret,
         )
 
-    def register(self, bot: lb.BotApp) -> None:
-        LostSectorSignal.register(bot)
-        LostSectorAutopostChannel.register(
-            bot, self.autopost_cmd_group, LostSectorSignal
-        )
-        self.control_cmd_group.child(self.commands())
-        # Temporarily disable twitter announcements
-        # bot.listen(LostSectorSignal)(self.announce_to_twitter)
-        # bot.listen(LostSectorTwitterSignal)(self.announce_to_twitter)
-        bot.listen(LostSectorDiscordSignal)(LostSectorAutopostChannel.announcer)
-
-    def commands(self):
-        return wtf.Command[
-            wtf.Implements[lb.SlashSubGroup],
-            wtf.Name["ls"],
-            wtf.Description["Lost sector announcement management"],
-            wtf.Guilds[cfg.control_discord_server_id],
-            wtf.InheritChecks[True],
-            wtf.Subcommands[
-                wtf.Command[
-                    wtf.Name["autoposts"],
-                    wtf.Description["Enable or disable automatic announcements"],
-                    wtf.AutoDefer[True],
-                    wtf.InheritChecks[True],
-                    wtf.Options[
-                        wtf.Option[
-                            wtf.Name["option"],
-                            wtf.Description["Enable or disable"],
-                            wtf.Type[str],
-                            wtf.Choices["Enable", "Disable"],
-                            wtf.Required[True],
-                        ],
-                    ],
-                    wtf.Implements[lb.SlashSubCommand],
-                    wtf.Executes[ls_control],
-                ],
-                wtf.Command[
-                    wtf.Name["update"],
-                    wtf.Description[
-                        "Update a lost sector post, optionally with text saying what has changed"
-                    ],
-                    wtf.Executes[self.update],
-                    wtf.InheritChecks[True],
-                    wtf.Implements[lb.SlashSubCommand],
-                ],
-                wtf.Command[
-                    wtf.Name["announce"],
-                    wtf.Description["Trigger an announcement manually"],
-                    wtf.AutoDefer[True],
-                    wtf.InheritChecks[True],
-                    wtf.Implements[lb.SlashSubCommand],
-                    wtf.Executes[ls_announce],
-                ],
-                wtf.Command[
-                    wtf.Name["announce_twitter"],
-                    wtf.Description["Trigger a twitter announcement manually"],
-                    wtf.AutoDefer[True],
-                    wtf.InheritChecks[True],
-                    wtf.Implements[lb.SlashSubCommand],
-                    wtf.Executes[ls_twitter_announce],
-                ],
-                wtf.Command[
-                    wtf.Name["announce_discord"],
-                    wtf.Description["Trigger a discord-only announcement manually"],
-                    wtf.AutoDefer[True],
-                    wtf.InheritChecks[True],
-                    wtf.Implements[lb.SlashSubCommand],
-                    wtf.Executes[ls_discord_announce],
-                ],
-            ],
-        ]
-
-    async def update(self, ctx: lb.Context):
-        """Correct a mistake in the announcement"""
-        change = ctx.options.change if ctx.options.change else ""
-        async with db_session() as session:
-            async with session.begin():
-                settings: LostSectorPostSettings = await session.get(
-                    self.settings_table, 0
-                )
-                if settings is None:
-                    await ctx.respond("Please enable autoposts before using this cmd")
-
-                channel_record_list = (
-                    await session.execute(
-                        select(self.autopost_channel_table).where(
-                            self.autopost_channel_table.enabled == True
-                        )
-                    )
-                ).fetchall()
-                channel_record_list = (
-                    [] if channel_record_list is None else channel_record_list
-                )
-                channel_record_list: List[BaseChannelRecord] = [
-                    channel[0] for channel in channel_record_list
-                ]
-            logger.info("Correcting posts")
-            with operation_timer("Announce correction", logger):
-                await ctx.respond("Correcting posts now")
-                message = await settings.get_announce_message()
-                no_of_channels = len(channel_record_list)
-                percentage_progress = 0
-                none_counter = 0
-
-                for idx, channel_record in enumerate(channel_record_list):
-                    if (
-                        channel_record.last_msg_id is None
-                        or channel_record.id not in list(cfg.followables.values())
-                    ):
-                        none_counter += 1
-                        continue
-
-                    await _edit_message(
-                        channel_record.last_msg_id,
-                        channel_record.id,
-                        ctx.bot,
-                        message.to_message_kwargs(),
-                        logger=logger,
-                    )
-
-                    if percentage_progress < round(20 * (idx + 1) / no_of_channels) * 5:
-                        percentage_progress = round(20 * (idx + 1) / no_of_channels) * 5
-                        await ctx.edit_last_response(
-                            "Updating posts: {}%\n".format(percentage_progress)
-                        )
-                await ctx.edit_last_response(
-                    "{} posts corrected".format(no_of_channels - none_counter)
-                )
-
     async def announce_to_twitter(self, event):
         try:
-            async with db_session() as session:
-                async with session.begin():
-                    settings: LostSectorPostSettings = await session.get(
-                        self.settings_table, 0
-                    )
-                    tweet_string, file_name = await settings.get_twitter_data_tuple()
-            await _run_in_thread_pool(
+            tweet_string, file_name = await get_twitter_data_tuple()
+            await utils.run_in_thread_pool(
                 self._announce_to_twitter_sync,
                 tweet_string,
                 file_name,
             )
         except ValueError as err:
-            await alert_owner(
+            await utils.alert_owner(
                 err.args[0],
                 channel=cfg.alerts_channel,
                 bot=event.bot,
@@ -648,4 +493,13 @@ class LostSectors(AutopostsBase):
             )
 
 
-lost_sectors = LostSectors()
+def register(bot: lb.BotApp) -> None:
+    controller.kyber.child(ls_group)
+    bot.command(ls_update)
+    LostSectorSignal.register(bot)
+    bot.listen(LostSectorSignal)(announcer)
+    # Temporarily disable twitter announcements
+    # twitter_handler = TwitterHandler()
+    # bot.listen(LostSectorSignal)(twitter_handler.announce_to_twitter)
+    # bot.listen(LostSectorTwitterSignal)(twitter_handler.announce_to_twitter)
+    bot.listen(LostSectorDiscordSignal)(announcer)
