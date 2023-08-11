@@ -289,7 +289,7 @@ async def get_twitter_data_tuple(date: dt.date = None) -> t.Tuple[str, str]:
     )
 
 
-class LostSectorPostSettings(autopost.BasePostSettings):
+class LostSectorPostSettings(autopost.BasePostSettings, utils.Base):
     pass
 
 
