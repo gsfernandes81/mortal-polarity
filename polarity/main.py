@@ -21,7 +21,7 @@ import miru as m
 import uvloop
 from lightbulb.ext import tasks
 
-from . import cfg, controller, posts, autopost, ls
+from . import autopost, cfg, controller, ls, posts
 
 uvloop.install()
 bot: lb.BotApp = lb.BotApp(**cfg.lightbulb_params)
@@ -39,7 +39,7 @@ async def update_status(guild_count: int):
 
 
 @bot.listen()
-async def on_start(event: lb.events.LightbulbStartedEvent):
+async def on_start_guild_count(event: lb.LightbulbStartedEvent):
     bot.d.guild_count = len(await bot.rest.fetch_my_guilds())
     await update_status(bot.d.guild_count)
 

@@ -14,22 +14,16 @@
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
 import logging
-from typing import Type
+import typing as t
 
+import aiocron
 import hikari as h
 import lightbulb as lb
 from aiohttp import web
 from hmessage import HMessage
-from sqlalchemy import BigInteger, Boolean, Integer, select
+from sqlalchemy import Boolean, Integer
 from sqlalchemy.orm import declarative_mixin, declared_attr
 from sqlalchemy.sql.schema import Column
-
-from . import cfg
-from .utils import (
-    db_session,
-    send_message,
-    followable_name,
-)
 
 app = web.Application()
 
@@ -57,36 +51,9 @@ class BasePostSettings:
         pass
 
 
-@declarative_mixin
-class BaseChannelRecord:
-    @declared_attr
-    def __tablename__(cls):
-        return cls.__name__.lower()
-
-    __mapper_args__ = {"eager_defaults": True}
-
-    id = Column("id", BigInteger, primary_key=True)
-    server_id = Column("server_id", BigInteger)
-    last_msg_id = Column("last_msg_id", BigInteger)
-    enabled = Column("enabled", Boolean)
-
-    # Settings object for this channel type
-    settings_records: Type[BasePostSettings]
-    # Follow channel for this announcement type
-    follow_channel: int = None
-    # Name displayed to user for this type of autopost
-    # Must be plural and end with autoposts
-    autopost_friendly_name: str = None
-
-    def __init__(self, id: int, server_id: int, enabled: bool):
-        self.id = id
-        self.server_id = server_id
-        self.enabled = enabled
-
-
 class BaseCustomEvent(h.Event):
     @classmethod
-    def register(cls, bot: lb.BotApp) -> h.Event:
+    def register(cls, bot: lb.BotApp) -> t.Self:
         """Instantiate the event and set the .app property to the specified bot"""
         self = cls()
         self._app = bot
@@ -117,52 +84,20 @@ class BaseCustomEvent(h.Event):
 class ResetSignal(BaseCustomEvent):
     qualifier: str
 
-    async def remote_dispatch(self, request: web.Request) -> web.Response:
-        """Function to be called when converting a http post -> a dispatched bot signal
-
-        This function checks that the call was from localhost and then fires the signal
-        Returns an aiohttp response (either 200: Success or 401)"""
-        if str(request.remote) == "127.0.0.1":
-            logger.info(
-                "{self.qualifier} reset signal received and passed on".format(self=self)
-            )
-            self.dispatch()
-            return web.Response(status=200)
-        else:
-            logger.warning(
-                "{self.qualifier} reset signal received from non-local source, ignoring".format(
-                    self=self
-                )
-            )
-            return web.Response(status=401)
-
-    def arm(self) -> None:
-        """Adds the route for this signal to the aiohttp routes table
-
-        Must be called for aiohttp to dispatch bot signals on http signal receipt"""
-        app.add_routes(
-            [
-                web.post(
-                    "/{self.qualifier}-reset-signal".format(self=self),
-                    self.remote_dispatch,
-                ),
-            ]
-        )
-
 
 class DailyResetSignal(ResetSignal):
     qualifier = "daily"
 
 
-async def start_signal_receiver(event: h.StartedEvent) -> None:
-    # Start the web server for periodic signals from apscheduler
-    runner = web.AppRunner(app)
-    await runner.setup()
-    # Switch to ipv4 since railway hosting does not like ipv6
-    site = web.TCPSite(runner, "127.0.0.1", cfg.port)
-    await site.start()
+async def on_start_schedule_signals(event: lb.LightbulbStartedEvent):
+    # Run every day at 17:00 UTC
+    @aiocron.crontab("0 17 * * *", start=True)
+    # Use below crontab for testing
+    # @aiocron.crontab("* * * * *", start=True)
+    async def autopost_ls():
+        DailyResetSignal.dispatch_with(bot=event.app)
 
 
 def register(bot: lb.BotApp) -> None:
-    DailyResetSignal.register(bot).arm()
-    bot.listen(h.StartedEvent)(start_signal_receiver)
+    DailyResetSignal.register(bot)
+    bot.listen(lb.LightbulbStartedEvent)(on_start_schedule_signals)
