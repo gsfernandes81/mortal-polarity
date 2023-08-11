@@ -32,13 +32,13 @@ def construct_emoji_substituter(emoji_list: t.List[h.Emoji]) -> t.Callable[[str]
 
     def func(match):
         try:
-            maybe_emoji_name: str = match.group(2)
+            maybe_emoji_name: str = str(match.group(2))
             for emoji in emoji_list:
                 if maybe_emoji_name.lower() == emoji.name.lower():
                     return emoji.mention
         except:
-            pass
-        finally:
+            return match.group(0)
+        else:
             return match.group(0)
 
     return func
