@@ -21,7 +21,7 @@ import miru as m
 import uvloop
 from lightbulb.ext import tasks
 
-from . import autopost, cfg, controller, ls, posts
+from . import cfg, controller, ls, posts
 
 uvloop.install()
 bot: lb.BotApp = lb.BotApp(**cfg.lightbulb_params)
@@ -59,7 +59,6 @@ async def on_guild_rm(event: h.events.GuildLeaveEvent):
 if __name__ == "__main__":
     logger.info("Listening on port number {}".format(cfg.port))
     m.install(bot)
-    autopost.register(bot)
     ls.register(bot)
     controller.register(bot)
     posts.register(bot)

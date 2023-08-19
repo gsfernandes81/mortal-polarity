@@ -17,20 +17,17 @@ import sys
 
 import lightbulb as lb
 
-from . import cfg
+from . import cfg, utils
 
 control_group_name = "ddv1"
 if cfg.test_env:
     control_group_name = "dev_ddv1"
 
 
-@lb.add_checks(lb.checks.has_roles(cfg.control_discord_role_id))
 @lb.command(
     control_group_name,
     "Commands for Kyber",
-    guilds=[
-        cfg.control_discord_server_id,
-    ],
+    guilds=[cfg.control_discord_server_id],
 )
 @lb.implements(lb.SlashCommandGroup)
 async def kyber():
@@ -38,18 +35,18 @@ async def kyber():
 
 
 @kyber.child
-@lb.add_checks(lb.checks.has_roles(cfg.control_discord_role_id))
 @lb.command("all_stop", "SHUT DOWN THE BOT", guilds=[cfg.control_discord_server_id])
 @lb.implements(lb.SlashSubCommand)
+@utils.check_admin
 async def all_stop(ctx: lb.Context):
     await ctx.respond("Bot is going down now.")
     await ctx.bot.close()
 
 
 @kyber.child
-@lb.add_checks(lb.checks.has_roles(cfg.control_discord_role_id))
 @lb.command("restart", "RESTART THE BOT", guilds=[cfg.control_discord_server_id])
 @lb.implements(lb.SlashSubCommand)
+@utils.check_admin
 async def restart(ctx: lb.Context):
     await ctx.respond("Bot is restarting now.")
     # Exits with a non 0 code which is picked up by railway.app

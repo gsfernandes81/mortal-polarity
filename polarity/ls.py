@@ -18,6 +18,7 @@ import datetime as dt
 import logging
 import typing as t
 
+import aiocron
 import hikari as h
 import lightbulb as lb
 import tweepy
@@ -30,7 +31,7 @@ from sector_accounting.sector_accounting import (
     Sector,
 )
 
-from . import autopost, cfg, controller, utils
+from . import cfg, controller, schemas, utils
 
 logger = logging.getLogger(__name__)
 
@@ -289,124 +290,152 @@ async def get_twitter_data_tuple(date: dt.date = None) -> t.Tuple[str, str]:
     )
 
 
-class LostSectorPostSettings(autopost.BasePostSettings, utils.Base):
-    pass
-
-
-async def announcer(event):
-    bot: lb.BotApp = event.app
-    logger.info("Announcing lost sector")
-
+async def discord_announcer(bot: lb.BotApp, check_enabled: bool = False):
     while True:
         retries = 0
         try:
+            if (
+                check_enabled
+                and not await schemas.LostSectorPostSettings.get_discord_enabled()
+            ):
+                return
             hmessage = await format_sector()
         except Exception as e:
             logger.exception(e)
             aio.sleep(2**retries)
         else:
             break
+
+    logger.info("Announcing lost sector to discord")
     await utils.send_message(bot, hmessage, crosspost=True)
+    logger.info("Announced lost sector to discord")
 
 
-class LostSectorSignal(autopost.BaseCustomEvent):
-    # Whether bot listen has been called on conditional_reset_repeater
-    _signal_linked: bool = False
+def sub_group(parent: lb.CommandLike, name: str, description: str):
+    @lb.command(name, description)
+    @lb.implements(lb.SlashSubGroup)
+    def _():
+        pass
 
-    @classmethod
-    async def conditional_daily_reset_repeater(
-        cls, event: autopost.DailyResetSignal
-    ) -> None:
-        """Dispatched self if autoannounces are enabled in the settings object"""
-        if await cls.is_autoannounce_enabled():
-            cls.dispatch_with(bot=event.app)
+    parent.child(_)
 
-    @classmethod
-    async def is_autoannounce_enabled(cls):
-        """Checks if autoannounces are enabled in the settings object"""
-        settings = await utils._create_or_get(
-            LostSectorPostSettings, 0, autoannounce_enabled=True
-        )
-        return settings.autoannounce_enabled
-
-    @classmethod
-    def register(cls, bot) -> None:
-        self = super().register(bot)
-        if not cls._signal_linked:
-            bot.listen()(cls.conditional_daily_reset_repeater)
-            cls._signal_linked = True
-        return self
-
-
-class LostSectorTwitterSignal(autopost.BaseCustomEvent):
-    "Signal to trigger a twitter specific lost sector post"
-    pass
-
-
-class LostSectorDiscordSignal(autopost.BaseCustomEvent):
-    "Signal to trigger a discord specific lost sector post"
-    pass
+    return _
 
 
 @lb.command(
-    "ls", "Lost sector announcement management", guilds=[cfg.control_discord_server_id]
+    "ls" if not cfg.test_env else "dev_ls",
+    "Commands for Kyber",
+    guilds=[cfg.control_discord_server_id],
 )
-@lb.implements(lb.SlashSubGroup)
+@lb.implements(lb.SlashCommandGroup)
 def ls_group():
     pass
 
 
-@ls_group.child
+ls_discord_group = sub_group(
+    ls_group, "discord", "Discord lost sector announcement management"
+)
+
+ls_twitter_group = sub_group(
+    ls_group, "twitter", "Twitter lost sector announcement management"
+)
+
+
+@ls_discord_group.child
 @lb.option(
     "option", "Enable or disable", str, choices=["Enable", "Disable"], required=True
 )
-@lb.command("autoposts", "Enable or disable automatic announcements", auto_defer=True)
-@lb.implements(lb.SlashSubCommand)
-@utils.check_admin
-async def ls_control(ctx: lb.Context):
-    option = True if ctx.options.option.lower() == "enable" else False
-    async with utils.db_session() as session:
-        async with session.begin():
-            settings = await session.get(LostSectorPostSettings, 0)
-            if settings is None:
-                settings = LostSectorPostSettings(0, option)
-                session.add(settings)
-            else:
-                settings.autoannounce_enabled = option
-    await ctx.respond(
-        "Lost sector announcements {}".format("Enabled" if option else "Disabled")
-    )
-
-
-@ls_group.child
-@lb.command("announce", "Trigger an announcement manually", auto_defer=True)
-@lb.implements(lb.SlashSubCommand)
-@utils.check_admin
-async def ls_announce(ctx: lb.Context):
-    await ctx.respond("Announcing now")
-    LostSectorSignal.dispatch_with(bot=ctx.bot)
-
-
-@ls_group.child
 @lb.command(
-    "announce_twitter", "Trigger a twitter announcement manually", auto_defer=True
+    "auto",
+    "Enable or disable discord automatic lost sector announcements",
+    auto_defer=True,
+    pass_options=True,
 )
 @lb.implements(lb.SlashSubCommand)
 @utils.check_admin
-async def ls_twitter_announce(ctx: lb.Context):
-    await ctx.respond("Announcing to twitter now")
-    LostSectorTwitterSignal.dispatch_with(bot=ctx.bot)
+async def ls_discord_control(ctx: lb.Context, option: str):
+    option = True if option.lower() == "enable" else False
+    enabled = await schemas.LostSectorPostSettings.get_discord_enabled()
+    if option == enabled:
+        return await ctx.respond(
+            "Lost sector announcements are already {}".format(
+                "enabled" if option else "disabled"
+            )
+        )
+    else:
+        await schemas.LostSectorPostSettings.set_discord_enabled(option)
+        await ctx.respond(
+            "Lost sector announcements now {}".format(
+                "Enabled" if option else "Disabled"
+            )
+        )
 
 
-@ls_group.child
-@lb.command(
-    "announce_discord", "Trigger a discord announcement manually", auto_defer=True
+@ls_twitter_group.child
+@lb.option(
+    "option", "Enable or disable", str, choices=["Enable", "Disable"], required=True
 )
+@lb.command(
+    "auto",
+    "Enable or disable twitter automatic lost sector announcements",
+    auto_defer=True,
+    pass_options=True,
+)
+@lb.implements(lb.SlashSubCommand)
+@utils.check_admin
+async def ls_twitter_control(ctx: lb.Context, option: str):
+    option = True if option.lower() == "enable" else False
+    enabled = await schemas.LostSectorPostSettings.get_twitter_enabled()
+    if option == enabled:
+        return await ctx.respond(
+            "Lost sector announcements are already {}".format(
+                "enabled" if option else "disabled"
+            )
+        )
+    else:
+        await schemas.LostSectorPostSettings.set_twitter_enabled(option)
+        await ctx.respond(
+            "Lost sector announcements now {}".format(
+                "Enabled" if option else "Disabled"
+            )
+        )
+
+
+@ls_discord_group.child
+@lb.command("send", "Trigger a discord announcement manually", auto_defer=True)
 @lb.implements(lb.SlashSubCommand)
 @utils.check_admin
 async def ls_discord_announce(ctx: lb.Context):
-    await ctx.respond("Announcing to discord now")
-    LostSectorDiscordSignal.dispatch_with(bot=ctx.bot)
+    await ctx.respond("Announcing to discord...")
+    await discord_announcer(ctx.bot)
+    await ctx.edit_last_response("Announced to discord")
+
+
+@ls_twitter_group.child
+@lb.command("send", "Trigger a twitter announcement manually", auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+@utils.check_admin
+async def ls_twitter_announce(ctx: lb.Context):
+    await ctx.respond("Announcing to twitter...")
+    await twitter_announcer(ctx.app)
+    await ctx.edit_last_response("Announced to twitter")
+
+
+@ls_twitter_group.child
+@lb.command("text", "Get twitter text (makes it easy to copy)", auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+@utils.check_admin
+async def ls_twitter_text(ctx: lb.Context):
+    await ctx.respond(content=f"```\n{(await get_twitter_data_tuple())[0]}\n```")
+
+
+@ls_group.child
+@lb.command("today", "Check the latest lost sector information", auto_defer=True)
+@lb.implements(lb.SlashSubCommand)
+@utils.check_admin
+async def ls_today(ctx: lb.Context):
+    await ctx.respond("Checking lost sector information...")
+    await ctx.edit_last_response(**(await format_sector()).to_message_kwargs())
 
 
 @lb.command("ls_update", "Update a lost sector post", ephemeral=True, auto_defer=True)
@@ -421,38 +450,50 @@ async def ls_update(ctx: lb.MessageContext):
     msg_to_update: h.Message = ctx.options.target
 
     async with utils.db_session() as session:
-        settings: LostSectorPostSettings = await session.get(LostSectorPostSettings, 0)
+        settings: schemas.LostSectorPostSettings = await session.get(
+            schemas.LostSectorPostSettings, 0
+        )
         if settings is None:
             await ctx.respond("Please enable autoposts before using this cmd")
 
         logger.info("Correcting posts")
 
         await ctx.edit_last_response("Updating post now")
-        message = await settings.get_announce_message()
-        message.embeds[0].title = "TEST"
+        message = await format_sector()
         await msg_to_update.edit(**message.to_message_kwargs())
         await ctx.edit_last_response("Post updated")
 
 
 class TwitterHandler:
-    def __init__(self):
-        self._twitter = tweepy.API(
-            tweepy.OAuth1UserHandler(
-                cfg.tw_cons_key,
-                cfg.tw_cons_secret,
-                cfg.tw_access_tok,
-                cfg.tw_access_tok_secret,
+    def __init__(self, twitter_v1: tweepy.API, twitter_v2: tweepy.Client) -> None:
+        self._twitter_v1 = twitter_v1
+        self._twitter_v2 = twitter_v2
+
+    @classmethod
+    def sign_in(cls) -> "TwitterHandler":
+        self = cls(
+            tweepy.API(
+                tweepy.OAuth1UserHandler(
+                    cfg.tw_cons_key,
+                    cfg.tw_cons_secret,
+                    cfg.tw_access_tok,
+                    cfg.tw_access_tok_secret,
+                ),
+                tweepy.Client(
+                    cfg.tw_bearer_tok,
+                    cfg.tw_cons_key,
+                    cfg.tw_cons_secret,
+                    cfg.tw_access_tok,
+                    cfg.tw_access_tok_secret,
+                ),
             )
         )
-        self._twitter_v2 = tweepy.Client(
-            cfg.tw_bearer_tok,
-            cfg.tw_cons_key,
-            cfg.tw_cons_secret,
-            cfg.tw_access_tok,
-            cfg.tw_access_tok_secret,
-        )
+        return self
 
-    async def announce_to_twitter(self, event):
+    async def announce_to_twitter(self, bot):
+        """Announce the lost sector to twitter
+
+        Bot must be passed so that errors are logged to discord"""
         try:
             tweet_string, file_name = await get_twitter_data_tuple()
             await utils.run_in_thread_pool(
@@ -464,7 +505,7 @@ class TwitterHandler:
             await utils.alert_owner(
                 err.args[0],
                 channel=cfg.alerts_channel,
-                bot=event.bot,
+                bot=bot,
                 mention_mods=True,
             )
 
@@ -478,7 +519,7 @@ class TwitterHandler:
         if attachment_file_name != None:
             # Upload the lost sector image
             media_id = int(
-                self._twitter.media_upload(
+                self._twitter_v1.media_upload(
                     filename=attachment_file_name,
                 ).media_id
             )
@@ -488,18 +529,51 @@ class TwitterHandler:
         # If we don't have a lost sector graphic, we can't use it of course
         # so we proceed with a text only tweet
         else:
-            self._twitter.update_status(
+            self._twitter_v1.update_status(
                 tweet_string,
             )
 
 
+async def twitter_announcer(discord_bot: lb.BotApp, check_enabled=False):
+    backoff_timer = 60
+    while True:
+        try:
+            if (
+                check_enabled
+                and not await schemas.LostSectorPostSettings.get_twitter_enabled()
+            ):
+                return
+            logger.info("Announcing lost sector to discord")
+            await TwitterHandler().sign_in().announce_to_twitter(discord_bot)
+        except Exception as e:
+            e.add_note(
+                f"Failed to post to twitter, retrying in {backoff_timer/60} minutes"
+            )
+            logger.exception(e)
+            await aio.sleep(backoff_timer)
+            backoff_timer *= 2
+        else:
+            logger.info("Announced lost sector to twitter")
+            break
+
+
+async def on_start_schedule_autoposts(event: lb.LightbulbStartedEvent):
+    # Run every day at 17:00 UTC
+    @aiocron.crontab("0 17 * * *", start=True)
+    # Use below crontab for testing to post every minute
+    # @aiocron.crontab("* * * * *", start=True)
+    async def autopost_ls():
+        await discord_announcer(event.app, check_enabled=True)
+
+    # Run every day at 17:00 UTC
+    @aiocron.crontab("0 17 * * *", start=True)
+    # Use below crontab for testing to post every minute
+    # @aiocron.crontab("* * * * *", start=True)
+    async def autopost_ls_twitter():
+        await twitter_announcer(event.app, check_enabled=True)
+
+
 def register(bot: lb.BotApp) -> None:
-    controller.kyber.child(ls_group)
+    bot.command(ls_group)
     bot.command(ls_update)
-    LostSectorSignal.register(bot)
-    bot.listen(LostSectorSignal)(announcer)
-    # Temporarily disable twitter announcements
-    # twitter_handler = TwitterHandler()
-    # bot.listen(LostSectorSignal)(twitter_handler.announce_to_twitter)
-    # bot.listen(LostSectorTwitterSignal)(twitter_handler.announce_to_twitter)
-    bot.listen(LostSectorDiscordSignal)(announcer)
+    bot.listen(lb.LightbulbStartedEvent)(on_start_schedule_autoposts)

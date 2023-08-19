@@ -30,8 +30,6 @@ import lightbulb as lb
 import yarl
 from hmessage import HMessage
 from pytz import utc
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
 
 from . import cfg
 
@@ -40,25 +38,8 @@ url_regex = re.compile(
 )
 
 
-Base = declarative_base()
-db_engine = create_async_engine(
-    cfg.legacy_db_url_async, connect_args={"timeout": 120}, pool_pre_ping=True
-)
-db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
-
-
 class FeatureDisabledError(Exception):
     pass
-
-
-async def _create_or_get(cls, id, **kwargs):
-    async with db_session() as session:
-        async with session.begin():
-            instance = await session.get(cls, id)
-            if instance is None:
-                instance = cls(id, **kwargs)
-                session.add(instance)
-    return instance
 
 
 @contextlib.contextmanager
@@ -280,14 +261,37 @@ class space:
 
 
 def followable_name(*, id: int):
-    return next(key for key, value in cfg.followables.items() if value == id)
+    return next((key for key, value in cfg.followables.items() if value == id), id)
 
 
 def check_admin(func):
-    async def wrapper(ctx: lb.Context):
+    async def wrapper(ctx: lb.Context, *args, **kwargs):
         if ctx.author.id not in cfg.admins:
             await ctx.respond("Only admins can use this command")
             return
-        return await func(ctx)
+        return await func(ctx, *args, **kwargs)
 
     return wrapper
+
+
+def ensure_session(sessionmaker):
+    """Decorator for functions that optionally want an sqlalchemy async session
+
+    Provides an async session via the `session` parameter if one is not already
+    provided via the same.
+
+    Caution: Always put below `@classmethod` and `@staticmethod`"""
+
+    def ensured_session(f: t.Coroutine):
+        async def wrapper(*args, **kwargs):
+            session = kwargs.pop("session", None)
+            if session is None:
+                async with sessionmaker() as session:
+                    async with session.begin():
+                        return await f(*args, **kwargs, session=session)
+            else:
+                return await f(*args, **kwargs, session=session)
+
+        return wrapper
+
+    return ensured_session

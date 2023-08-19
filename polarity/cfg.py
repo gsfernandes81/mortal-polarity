@@ -15,6 +15,7 @@
 
 import abc
 import json
+import ssl
 import typing as t
 from os import getenv as __getenv
 
@@ -57,23 +58,31 @@ def _lightbulb_params() -> dict:
     return lightbulb_params
 
 
-def _legacy_db_url(var_name: str) -> tuple[str, str]:
-    # Url for the bot and scheduler db
-    # SQAlchemy doesn't play well with postgres://, hence we replace
-    # it with postgresql://
-    legacy_db_url = _getenv(var_name)
-    if legacy_db_url.startswith("postgres"):
-        repl_till = legacy_db_url.find("://")
-        legacy_db_url = legacy_db_url[repl_till:]
-        legacy_db_url_async = "postgresql+asyncpg" + legacy_db_url
-        legacy_db_url = "postgresql" + legacy_db_url
-    return legacy_db_url, legacy_db_url_async
+def _db_urls(var_name: str) -> tuple[str, str]:
+    db_url = _getenv(var_name)
+    __repl_till = db_url.find("://")
+    db_url = db_url[__repl_till:]
+    db_url_async = "mysql+asyncmy" + db_url
+    db_url = "mysql" + db_url
+    return db_url, db_url_async
 
 
 def _db_config():
-    # Async SQLAlchemy DB Session KWArg Parameters
-    db_session_kwargs = {"expire_on_commit": False, "class_": AsyncSession}
-    return db_session_kwargs
+    db_session_kwargs_sync = {
+        "expire_on_commit": False,
+    }
+    db_session_kwargs = db_session_kwargs_sync | {
+        "class_": AsyncSession,
+    }
+
+    db_connect_args = {}
+    if _getenv("MYSQL_SSL", "true") == "true":
+        ssl_ctx = ssl.create_default_context(
+            cafile="/etc/ssl/certs/ca-certificates.crt"
+        )
+        ssl_ctx.verify_mode = ssl.CERT_REQUIRED
+        db_connect_args.update({"ssl": ssl_ctx})
+    return db_session_kwargs, db_session_kwargs_sync, db_connect_args
 
 
 def _sheets_credentials(
@@ -119,7 +128,7 @@ embed_error_color = h.Color(int(_getenv("EMBED_ERROR_COLOR"), 16))
 followables: t.Dict[str, int] = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
 
 # Database URLs
-legacy_db_url, legacy_db_url_async = _legacy_db_url("DATABASE_URL")
+db_url, db_url_async = _db_urls("MYSQL_URL")
 
 # Sheets credentials & URLs
 gsheets_credentials = _sheets_credentials(
@@ -148,7 +157,7 @@ port = int(_getenv("PORT") or 5000)
 
 ####### Configs & constants #######
 
-db_session_kwargs = _db_config()
+db_session_kwargs, db_session_kwargs_sync, db_connect_args = _db_config()
 lightbulb_params = _lightbulb_params()
 
 
