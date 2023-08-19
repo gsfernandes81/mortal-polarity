@@ -21,7 +21,7 @@ import miru as m
 import uvloop
 from lightbulb.ext import tasks
 
-from . import cfg, controller, ls, posts
+from . import cfg, controller, ls, posts, source
 
 uvloop.install()
 bot: lb.BotApp = lb.BotApp(**cfg.lightbulb_params)
@@ -60,6 +60,7 @@ if __name__ == "__main__":
     logger.info("Listening on port number {}".format(cfg.port))
     m.install(bot)
     ls.register(bot)
+    source.register(bot)
     controller.register(bot)
     posts.register(bot)
     tasks.load(bot)
