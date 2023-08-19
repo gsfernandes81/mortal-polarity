@@ -4,7 +4,7 @@ SOURCE_CODE_NOTICE = """
 ```
 Copyright © 2019-present gsfernandes81
 
-This bot is open source! You can find the source code at \
+This bot (mortal-polarity) is open source! You can find the source code at \
 https://github.com/geolocatingshark/mortal-polarity.git
 
 mortal-polarity is free software: you can redistribute it and/or modify it under the \
