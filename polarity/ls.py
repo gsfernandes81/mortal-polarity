@@ -17,6 +17,7 @@ import asyncio as aio
 import datetime as dt
 import logging
 import typing as t
+import dateparser
 
 import aiocron
 import hikari as h
@@ -283,7 +284,7 @@ async def get_twitter_data_tuple(date: dt.date = None) -> t.Tuple[str, str]:
     date = date or dt.datetime.now(tz=utc)
     rot = Rotation.from_gspread_url(
         cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=1  # minutes
-    )().to_sector_v1()
+    )(date).to_sector_v1()
     return (
         format_twitter_post(rot),
         await utils.download_linked_image(rot.shortlink_gfx),
@@ -422,11 +423,21 @@ async def ls_twitter_announce(ctx: lb.Context):
 
 
 @ls_twitter_group.child
-@lb.command("text", "Get twitter text (makes it easy to copy)", auto_defer=True)
+@lb.option("date", "Date to check", default="")
+@lb.command(
+    "text",
+    "Get twitter text (makes it easy to copy)",
+    auto_defer=True,
+    pass_options=True,
+)
 @lb.implements(lb.SlashSubCommand)
 @utils.check_admin
-async def ls_twitter_text(ctx: lb.Context):
-    await ctx.respond(content=f"```\n{(await get_twitter_data_tuple())[0]}\n```")
+async def ls_twitter_text(ctx: lb.Context, date: str = ""):
+    if date:
+        date = dateparser.parse(date).replace(tzinfo=utc)
+    else:
+        date = dt.datetime.now(tz=utc)
+    await ctx.respond(content=f"```\n{(await get_twitter_data_tuple(date))[0]}\n```")
 
 
 @ls_group.child

@@ -26,6 +26,7 @@ sqlalchemy = "^2.0.1"
 tweepy = ">=4.12.0"
 uvloop = "^0.17.0"
 yarl = "^1.9.2"
+dateparser = "^1.1.8"
 
 [tool.poetry.dev-dependencies]
 pyflakes = "*"
