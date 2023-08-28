@@ -460,7 +460,7 @@ async def ls_update(ctx: lb.MessageContext):
 
     msg_to_update: h.Message = ctx.options.target
 
-    async with utils.db_session() as session:
+    async with schemas.db_session() as session:
         settings: schemas.LostSectorPostSettings = await session.get(
             schemas.LostSectorPostSettings, 0
         )
