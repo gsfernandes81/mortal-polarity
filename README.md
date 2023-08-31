@@ -2,19 +2,32 @@
 
 Setting up the dev environment:
 
-1. Get a working poetry installation
-2. `poetry install`
-3. Set up `.env` with environment variables referencing polarity.cfg
-4. `poetry shell` to jump into the virtualenv
+1. Get a working [Poetry](https://python-poetry.org/) installation
+2. Run `poetry install` in the root of the git clone
+3. `poetry shell` to jump into the virtualenv
+4. [Optional] Set up the `.env` with environment variables refering to `polarity/cfg.py` & `.env-example`
 
 Running code locally:
 
-0. `poetry shell`
-1. `honcho start -f Procfile.release` (mainly if a db migration is needed)
-2. `honcho start`
+```
+make run-local
+```
+
+Running tests locally:
+
+```
+make test
+```
 
 Running code locally with docker:
-NOTE: Migrations not set up yet
 
-1. `docker build -t polarity .`
-2. `docker run --env-file=.env polarity`
+```
+docker build -t polarity .
+docker run --env-file=.env polarity
+```
+
+Deploying code to [railway](https://railway.app/)
+
+0. Make sure you have the [railway cli](https://docs.railway.app/develop/cli) installed and are logged in
+1. `make deploy-dev` to deploy to the dev instance
+2. **CAUTION**: `make deploy-prod` to deploy to the production instance
