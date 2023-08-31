@@ -148,9 +148,6 @@ tw_access_tok = str(_getenv("TWITTER_ACCESS_TOKEN"))
 tw_access_tok_secret = str(_getenv("TWITTER_ACCESS_TOKEN_SECRET"))
 tw_bearer_tok = str(_getenv("TWITTER_BEARER_TOKEN"))
 
-# Listening port
-port = int(_getenv("PORT") or 5000)
-
 #### Environment variables end ####
 
 ###################################

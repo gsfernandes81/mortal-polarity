@@ -57,7 +57,6 @@ async def on_guild_rm(event: h.events.GuildLeaveEvent):
 
 
 if __name__ == "__main__":
-    logger.info("Listening on port number {}".format(cfg.port))
     m.install(bot)
     ls.register(bot)
     source.register(bot)
