@@ -116,20 +116,58 @@ class MessageFailureError(Exception):
     source_exception_details: Exception = attr.ib()
 
 
+async def find_duplicate_uncrossposted_message(
+    message: HMessage,
+    channel: h.GuildNewsChannel,
+    lookback_days: int = 2,
+) -> h.Message | None:
+    async for channel_message in channel.fetch_history(
+        after=dt.datetime.now(tz=utc) - dt.timedelta(days=lookback_days)
+    ):
+        channel_message_proto = HMessage.from_message(channel_message)
+
+        if (
+            h.MessageFlag.CROSSPOSTED not in channel_message.flags
+            and channel_message_proto == message
+        ):
+            logging.error(
+                "Found duplicate, uncrossposted lost sector message after reported "
+                "failure to send. Returning message for crossposting if necessary..."
+            )
+            return channel_message
+        else:
+            return None
+
+
 async def send_message(
-    bot: lb.BotApp, msg_proto: HMessage, crosspost: bool = True
+    bot: lb.BotApp,
+    msg_proto: HMessage,
+    crosspost: bool = True,
+    deduplicate: bool = False,
 ) -> h.Message:
     channel = cfg.followables["lost_sector"]
     send_backoff = 10
     while True:
         try:
-            channel: h.TextableGuildChannel = bot.cache.get_guild_channel(
-                channel
-            ) or await bot.rest.fetch_channel(channel)
-            msg_proto = await channel.send(**msg_proto.to_message_kwargs())
+            channel: h.TextableGuildChannel = (
+                bot.cache.get_guild_channel(channel)
+                or await bot.rest.fetch_channel(channel)
+                or None
+            )
+            msg = await channel.send(**msg_proto.to_message_kwargs())
         except Exception as e:
             e.add_note("Failed to send lost sector with exception\n")
             logging.exception(e)
+
+            if deduplicate and channel:
+                # channel.send sometimes "fails" while still sending out
+                # the correct message. In case this happens, check for
+                # such a message, assign it to "msg" and continue forward
+                # for it to be corssposted
+                msg = await find_duplicate_uncrossposted_message(msg_proto, channel)
+                if msg:
+                    break
+
             await aio.sleep(send_backoff)
             send_backoff = send_backoff * 2
         else:
@@ -145,7 +183,7 @@ async def send_message(
     crosspost_backoff = 30
     while True:
         try:
-            await bot.rest.crosspost_message(channel.id, msg_proto.id)
+            await bot.rest.crosspost_message(channel.id, msg.id)
         except Exception as e:
             if (
                 isinstance(e, h.BadRequestError)

@@ -12,9 +12,9 @@ aiohttp = ">=3.8.3"
 asyncmy = "^0.2.7rc6"
 cryptography = "^41.0.3"
 faust-cchardet = "^2.1.18"
-hikari = { extras = ["speedups"], version = "==2.0.0.dev120" }
+hikari = { extras = ["speedups"], version = "==2.0.0.dev122" }
 hikari-lightbulb = "^2.3.1"
-hikari-message = {git = "https://github.com/gs729/hikari-message.git"}
+hikari-message = {git = "https://github.com/gs729/hikari-message.git", rev = "90796c4"}
 hikari-miru = "^3.1.1"
 hikari-toolbox = { git = "https://github.com/brazier-dev/hikari-toolbox.git" }
 honcho = "^1.1.0"

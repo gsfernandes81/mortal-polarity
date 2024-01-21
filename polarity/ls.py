@@ -17,9 +17,9 @@ import asyncio as aio
 import datetime as dt
 import logging
 import typing as t
-import dateparser
 
 import aiocron
+import dateparser
 import hikari as h
 import lightbulb as lb
 import tweepy
@@ -221,13 +221,12 @@ async def format_sector(
         h.Embed(
             title="**Lost Sector Today**",
             description=(
-                f"{LS_EMOJI}{utils.space.three_per_em}{sector_name}\n"
+                f"{LS_EMOJI}{utils.space.three_per_em}{sector_name.strip()}\n"
                 + (
-                    f"{LOCATION_EMOJI}{utils.space.three_per_em}{sector_location}\n"
+                    f"{LOCATION_EMOJI}{utils.space.three_per_em}{sector_location.strip()}"
                     if sector_location
                     else ""
                 )
-                + f"\n"
             ),
             color=cfg.embed_default_color,
             url="https://lostsectortoday.com/",
@@ -308,7 +307,7 @@ async def discord_announcer(bot: lb.BotApp, check_enabled: bool = False):
             break
 
     logger.info("Announcing lost sector to discord")
-    await utils.send_message(bot, hmessage, crosspost=True)
+    await utils.send_message(bot, hmessage, crosspost=True, deduplicate=True)
     logger.info("Announced lost sector to discord")
 
 
