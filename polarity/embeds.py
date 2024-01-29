@@ -24,22 +24,21 @@ import regex as re
 from . import cfg
 from .utils import follow_link_single_step
 
-re_user_side_emoji = re.compile("(<a?)?:(\w+):(\d+>)?")
+re_user_side_emoji = re.compile("(<a?)?:(\w+)(~\d)*:(\d+>)?")
 
 
-def construct_emoji_substituter(emoji_list: t.List[h.Emoji]) -> t.Callable[[str], str]:
+def construct_emoji_substituter(
+    emoji_dict: t.Dict[str, h.Emoji],
+) -> t.Callable[[re.Match], str]:
     """Constructs a substituter for user-side emoji to be used in re.sub"""
 
-    def func(match):
-        try:
-            maybe_emoji_name: str = str(match.group(2))
-            for emoji in emoji_list:
-                if maybe_emoji_name.lower() == emoji.name.lower():
-                    return emoji.mention
-        except:
-            return match.group(0)
-        else:
-            return match.group(0)
+    def func(match: re.Match) -> str:
+        maybe_emoji_name = str(match.group(2))
+        return str(
+            emoji_dict.get(maybe_emoji_name)
+            or emoji_dict.get(maybe_emoji_name.lower())
+            or match.group(0)
+        )
 
     return func
 
@@ -150,9 +149,10 @@ class EmbedBuilderView(InteractiveBuilderView):
         ) or await bot.rest.fetch_guild(cfg.kyber_discord_server_id)
 
         # Substitutes user-side emoji with their respective mentions
-        guild_emoji = await guild.fetch_emojis()
+        emoji_dict = {emoji.name: emoji for emoji in await guild.fetch_emojis()}
+
         description = re_user_side_emoji.sub(
-            construct_emoji_substituter(guild_emoji), description
+            construct_emoji_substituter(emoji_dict), description
         )
 
         embed.description = description

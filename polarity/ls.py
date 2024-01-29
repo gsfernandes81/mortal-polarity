@@ -32,22 +32,10 @@ from sector_accounting.sector_accounting import (
     Sector,
 )
 
-from . import cfg, controller, schemas, utils
+from . import cfg, schemas, utils
+from .embeds import construct_emoji_substituter, re_user_side_emoji
 
 logger = logging.getLogger(__name__)
-
-LS_EMOJI = "<:LS:849727805994565662>"
-SOLAR_EMOJI = "<:solar:849726154540974183>"
-ARC_EMOJI = "<:arc:849725765063016508>"
-VOID_EMOJI = "<:void:849726137181405204>"
-STASIS_EMOJI = "<:stasis:1092891643490873384>"
-STRAND_EMOJI = "<:strand:1096267542890287126> "
-BARRIER_EMOJI = "<:barrier:1098297383974088876>"
-OVERLOAD_EMOJI = "<:overload:1098296903290069123>"
-UNSTOPPABLE_EMOJI = "<:unstoppable:1098296844955693056>"
-SWORDS_EMOJI = "<:swords:849729529076514866>"
-LOCATION_EMOJI = "<:location:1086525796031676556>"
-EXOTIC_ENGRAM_EMOJI = "<:exotic_engram:849898122083434506>"
 
 
 twitter_ls_post_string = utils.endl(
@@ -78,7 +66,9 @@ def _fmt_count(emoji: str, count: int, width: int) -> str:
 
 
 def format_counts(
-    legend_data: DifficultySpecificSectorData, master_data: DifficultySpecificSectorData
+    legend_data: DifficultySpecificSectorData,
+    master_data: DifficultySpecificSectorData,
+    emoji_dict: t.Dict[str, h.Emoji],
 ) -> str:
     len_bar = len(
         str(max(legend_data.barrier_champions, master_data.barrier_champions, key=abs))
@@ -118,10 +108,14 @@ def format_counts(
             filter(
                 None,
                 [
-                    _fmt_count(BARRIER_EMOJI, data.barrier_champions, len_bar),
-                    _fmt_count(OVERLOAD_EMOJI, data.overload_champions, len_oload),
+                    _fmt_count(emoji_dict["barrier"], data.barrier_champions, len_bar),
                     _fmt_count(
-                        UNSTOPPABLE_EMOJI, data.unstoppable_champions, len_unstop
+                        emoji_dict["overload"], data.overload_champions, len_oload
+                    ),
+                    _fmt_count(
+                        emoji_dict["unstoppable"],
+                        data.unstoppable_champions,
+                        len_unstop,
                     ),
                 ],
             )
@@ -130,11 +124,11 @@ def format_counts(
             filter(
                 None,
                 [
-                    _fmt_count(ARC_EMOJI, data.arc_shields, len_arc),
-                    _fmt_count(VOID_EMOJI, data.void_shields, len_void),
-                    _fmt_count(SOLAR_EMOJI, data.solar_shields, len_solar),
-                    _fmt_count(STASIS_EMOJI, data.stasis_shields, len_stasis),
-                    _fmt_count(STRAND_EMOJI, data.strand_shields, len_strand),
+                    _fmt_count(emoji_dict["arc"], data.arc_shields, len_arc),
+                    _fmt_count(emoji_dict["void"], data.void_shields, len_void),
+                    _fmt_count(emoji_dict["solar"], data.solar_shields, len_solar),
+                    _fmt_count(emoji_dict["stasis"], data.stasis_shields, len_stasis),
+                    _fmt_count(emoji_dict["strand"], data.strand_shields, len_strand),
                 ],
             )
         )
@@ -158,6 +152,7 @@ def format_counts(
 
 
 async def format_sector(
+    emoji_dict: t.Dict[str, h.Emoji],
     date: dt.date = None,
     thumbnail: h.Attachment = None,
     secondary_image: h.Attachment = None,
@@ -180,31 +175,12 @@ async def format_sector(
         ls_gfx_url = None
 
     # Surges to emojis
-    _surges = [surge.lower() for surge in sector.surges]
     surges = []
-    if "solar" in _surges:
-        surges += [SOLAR_EMOJI]
-    if "arc" in _surges:
-        surges += [ARC_EMOJI]
-    if "void" in _surges:
-        surges += [VOID_EMOJI]
-    if "stasis" in _surges:
-        surges += [STASIS_EMOJI]
-    if "strand" in _surges:
-        surges += [STRAND_EMOJI]
+    for surge in sector.surges:
+        surges += [str(emoji_dict.get(surge) or emoji_dict.get(surge.lower()))]
 
     # Threat to emoji
-    threat = sector.threat.lower()
-    if threat == "solar":
-        threat = SOLAR_EMOJI
-    elif threat == "arc":
-        threat = ARC_EMOJI
-    elif threat == "void":
-        threat = VOID_EMOJI
-    elif threat == "stasis":
-        threat = STASIS_EMOJI
-    elif threat == "strand":
-        threat = STRAND_EMOJI
+    threat = emoji_dict.get(sector.threat) or emoji_dict.get(sector.threat.lower())
 
     overcharged_weapon_emoji = (
         "⚔️" if sector.overcharged_weapon.lower() in ["sword", "glaive"] else "🔫"
@@ -217,13 +193,20 @@ async def format_sector(
         sector_name = sector.name
         sector_location = None
 
+    # Legendary weapon rewards
+    legendary_weapon_rewards = sector.legendary_rewards
+
+    legendary_weapon_rewards = re_user_side_emoji.sub(
+        construct_emoji_substituter(emoji_dict), legendary_weapon_rewards
+    )
+
     embed = (
         h.Embed(
             title="**Lost Sector Today**",
             description=(
-                f"{LS_EMOJI}{utils.space.three_per_em}{sector_name.strip()}\n"
+                f"{emoji_dict['LS']}{utils.space.three_per_em}{sector_name.strip()}\n"
                 + (
-                    f"{LOCATION_EMOJI}{utils.space.three_per_em}{sector_location.strip()}"
+                    f"{emoji_dict['location']}{utils.space.three_per_em}{sector_location.strip()}"
                     if sector_location
                     else ""
                 )
@@ -232,23 +215,29 @@ async def format_sector(
             url="https://lostsectortoday.com/",
         )
         .add_field(
-            name=f"Reward",
-            value=f"{EXOTIC_ENGRAM_EMOJI}{utils.space.three_per_em}Exotic {sector.reward} (If-Solo)",
+            name="Reward",
+            value=str(emoji_dict["exotic_engram"])
+            + f"{utils.space.three_per_em}Exotic {sector.reward} (If-Solo)",
         )
         .add_field(
-            name=f"Champs and Shields",
-            value=format_counts(sector.legend_data, sector.master_data),
+            name="Champs and Shields",
+            value=format_counts(sector.legend_data, sector.master_data, emoji_dict),
         )
         .add_field(
-            name=f"Elementals",
+            name="Elementals",
             value=f"Surge: {utils.space.punctuation}{utils.space.hair}{utils.space.hair}"
             + " ".join(surges)
             + f"\nThreat: {threat}",
         )
         .add_field(
-            name=f"Modifiers",
-            value=f"{SWORDS_EMOJI}{utils.space.three_per_em}{sector.to_sector_v1().modifiers}"
+            name="Modifiers",
+            value=str(emoji_dict["swords"])
+            + f"{utils.space.three_per_em}{sector.to_sector_v1().modifiers}"
             + f"\n{overcharged_weapon_emoji}{utils.space.three_per_em}Overcharged {sector.overcharged_weapon}",
+        )
+        .add_field(
+            "Legendary Weapons (If-Solo)",
+            legendary_weapon_rewards,
         )
     )
 
@@ -282,7 +271,9 @@ def format_twitter_post(sector: Sector):
 async def get_twitter_data_tuple(date: dt.date = None) -> t.Tuple[str, str]:
     date = date or dt.datetime.now(tz=utc)
     rot = Rotation.from_gspread_url(
-        cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=1  # minutes
+        cfg.sheets_ls_url,
+        cfg.gsheets_credentials,
+        buffer=1,  # minutes
     )(date).to_sector_v1()
     return (
         format_twitter_post(rot),
@@ -445,7 +436,14 @@ async def ls_twitter_text(ctx: lb.Context, date: str = ""):
 @utils.check_admin
 async def ls_today(ctx: lb.Context):
     await ctx.respond("Checking lost sector information...")
-    await ctx.edit_last_response(**(await format_sector()).to_message_kwargs())
+    guild = ctx.app.cache.get_guild(
+        cfg.kyber_discord_server_id
+    ) or await ctx.app.rest.fetch_guild(cfg.kyber_discord_server_id)
+    emoji_dict = {emoji.name: emoji for emoji in await guild.fetch_emojis()}
+
+    sector = await format_sector(emoji_dict=emoji_dict)
+
+    await ctx.edit_last_response(**sector.to_message_kwargs())
 
 
 @lb.command("ls_update", "Update a lost sector post", ephemeral=True, auto_defer=True)
@@ -526,7 +524,7 @@ class TwitterHandler:
             )
         # If we have a lost sector graphic, the file name will not be none
         # or we can upload this graphic to twitter or use it
-        if attachment_file_name != None:
+        if attachment_file_name is not None:
             # Upload the lost sector image
             media_id = int(
                 self._twitter_v1.media_upload(
