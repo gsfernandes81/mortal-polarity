@@ -285,12 +285,16 @@ async def discord_announcer(bot: lb.BotApp, check_enabled: bool = False):
     while True:
         retries = 0
         try:
+            guild = bot.cache.get_guild(
+                cfg.kyber_discord_server_id
+            ) or await bot.rest.fetch_guild(cfg.kyber_discord_server_id)
+            emoji_dict = {emoji.name: emoji for emoji in await guild.fetch_emojis()}
             if (
                 check_enabled
                 and not await schemas.LostSectorPostSettings.get_discord_enabled()
             ):
                 return
-            hmessage = await format_sector()
+            hmessage = await format_sector(emoji_dict=emoji_dict)
         except Exception as e:
             logger.exception(e)
             aio.sleep(2**retries)
@@ -467,7 +471,13 @@ async def ls_update(ctx: lb.MessageContext):
         logger.info("Correcting posts")
 
         await ctx.edit_last_response("Updating post now")
-        message = await format_sector()
+
+        guild = ctx.app.cache.get_guild(
+            cfg.kyber_discord_server_id
+        ) or await ctx.app.rest.fetch_guild(cfg.kyber_discord_server_id)
+        emoji_dict = {emoji.name: emoji for emoji in await guild.fetch_emojis()}
+
+        message = await format_sector(emoji_dict=emoji_dict)
         await msg_to_update.edit(**message.to_message_kwargs())
         await ctx.edit_last_response("Post updated")
 
