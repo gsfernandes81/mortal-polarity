@@ -164,6 +164,12 @@ async def send_message(
                 # the correct message. In case this happens, check for
                 # such a message, assign it to "msg" and continue forward
                 # for it to be corssposted
+                #
+                # Wait before doing this to ensure that when
+                # find_duplicate_uncrossposted_message is called and checks
+                # the channel message history, the message will appear if
+                # it was sent
+                await aio.sleep(send_backoff / 2)
                 msg = await find_duplicate_uncrossposted_message(msg_proto, channel)
                 if msg:
                     break
