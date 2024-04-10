@@ -11,6 +11,9 @@ deploy-prod:
 run-local: .env
 	poetry run honcho start
 
+recreate-schemas: .env
+	poetry run honcho run python -m polarity.schemas
+
 test: .env
 	poetry run honcho run python -m pytest
 
