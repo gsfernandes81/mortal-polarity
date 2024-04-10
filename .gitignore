@@ -135,3 +135,7 @@ ToDo
 # Image files from the _download_linked_image function
 *.jpg
 *.png
+
+# Bungie api files
+world_sql_content*
+manifest.zip
