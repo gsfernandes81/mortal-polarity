@@ -1815,29 +1815,6 @@ pymysql = ["pymysql"]
 sqlcipher = ["sqlcipher3_binary"]
 
 [[package]]
-name = "tweepy"
-version = "4.14.0"
-description = "Twitter library for Python"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "tweepy-4.14.0-py3-none-any.whl", hash = "sha256:db6d3844ccc0c6d27f339f12ba8acc89912a961da513c1ae50fa2be502a56afb"},
-    {file = "tweepy-4.14.0.tar.gz", hash = "sha256:1f9f1707d6972de6cff6c5fd90dfe6a449cd2e0d70bd40043ffab01e07a06c8c"},
-]
-
-[package.dependencies]
-oauthlib = ">=3.2.0,<4"
-requests = ">=2.27.0,<3"
-requests-oauthlib = ">=1.2.0,<2"
-
-[package.extras]
-async = ["aiohttp (>=3.7.3,<4)", "async-lru (>=1.0.3,<3)"]
-dev = ["coverage (>=4.4.2)", "coveralls (>=2.1.0)", "tox (>=3.21.0)"]
-docs = ["myst-parser (==0.15.2)", "readthedocs-sphinx-search (==0.1.1)", "sphinx (==4.2.0)", "sphinx-hoverxref (==0.7b1)", "sphinx-rtd-theme (==1.0.0)", "sphinx-tabs (==3.2.0)"]
-socks = ["requests[socks] (>=2.27.0,<3)"]
-test = ["vcrpy (>=1.10.3)"]
-
-[[package]]
 name = "typing-extensions"
 version = "4.9.0"
 description = "Backported and Experimental Type Hints for Python 3.8+"
@@ -2042,4 +2019,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.11.0"
-content-hash = "15e61ee66bd9865beea2194a32956d0f2202b6df853c25046e5340517ab4a062"
+content-hash = "f5c356a47cb4a93a4becd5dc1acbc66e130f9adf56720c85e1792128304c5ea2"

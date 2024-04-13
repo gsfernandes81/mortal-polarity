@@ -19,10 +19,8 @@ import logging
 import typing as t
 
 import aiocron
-import dateparser
 import hikari as h
 import lightbulb as lb
-import tweepy
 from aiohttp import InvalidURL
 from hmessage import HMessage
 from pytz import utc
@@ -36,23 +34,6 @@ from . import cfg, schemas, utils
 from .embeds import construct_emoji_substituter, re_user_side_emoji
 
 logger = logging.getLogger(__name__)
-
-
-twitter_ls_post_string = utils.endl(
-    "Lost Sector Today",
-    "",
-    "🗺️ {sector.name}",
-    "🏆 Exotic {sector.reward}",
-    "",
-    "👹 {sector.champions}",
-    "🛡️ {sector.shields}",
-    "☢️ {sector.burn} Threat",
-    "{weapon_emoji} {sector.overcharged_weapon} Overcharge",
-    "💪 {sector.surge} Surge",
-    "🛠️ {sector.modifiers}",
-    "",
-    "🔗 lostsectortoday.com",
-)
 
 
 def _fmt_count(emoji: str, count: int, width: int) -> str:
@@ -261,26 +242,6 @@ async def format_sector(
     return HMessage(embeds=embeds)
 
 
-def format_twitter_post(sector: Sector):
-    weapon_emoji = (
-        "⚔️" if sector.overcharged_weapon.lower() in ["sword", "glaive"] else "🔫"
-    )
-    return twitter_ls_post_string.format(sector=sector, weapon_emoji=weapon_emoji)
-
-
-async def get_twitter_data_tuple(date: dt.date = None) -> t.Tuple[str, str]:
-    date = date or dt.datetime.now(tz=utc)
-    rot = Rotation.from_gspread_url(
-        cfg.sheets_ls_url,
-        cfg.gsheets_credentials,
-        buffer=1,  # minutes
-    )(date).to_sector_v1()
-    return (
-        format_twitter_post(rot),
-        await utils.download_linked_image(rot.shortlink_gfx),
-    )
-
-
 async def discord_announcer(bot: lb.BotApp, check_enabled: bool = False):
     while True:
         retries = 0
@@ -331,10 +292,6 @@ ls_discord_group = sub_group(
     ls_group, "discord", "Discord lost sector announcement management"
 )
 
-ls_twitter_group = sub_group(
-    ls_group, "twitter", "Twitter lost sector announcement management"
-)
-
 
 @ls_discord_group.child
 @lb.option(
@@ -366,36 +323,6 @@ async def ls_discord_control(ctx: lb.Context, option: str):
         )
 
 
-@ls_twitter_group.child
-@lb.option(
-    "option", "Enable or disable", str, choices=["Enable", "Disable"], required=True
-)
-@lb.command(
-    "auto",
-    "Enable or disable twitter automatic lost sector announcements",
-    auto_defer=True,
-    pass_options=True,
-)
-@lb.implements(lb.SlashSubCommand)
-@utils.check_admin
-async def ls_twitter_control(ctx: lb.Context, option: str):
-    option = True if option.lower() == "enable" else False
-    enabled = await schemas.LostSectorPostSettings.get_twitter_enabled()
-    if option == enabled:
-        return await ctx.respond(
-            "Lost sector announcements are already {}".format(
-                "enabled" if option else "disabled"
-            )
-        )
-    else:
-        await schemas.LostSectorPostSettings.set_twitter_enabled(option)
-        await ctx.respond(
-            "Lost sector announcements now {}".format(
-                "Enabled" if option else "Disabled"
-            )
-        )
-
-
 @ls_discord_group.child
 @lb.command("send", "Trigger a discord announcement manually", auto_defer=True)
 @lb.implements(lb.SlashSubCommand)
@@ -404,34 +331,6 @@ async def ls_discord_announce(ctx: lb.Context):
     await ctx.respond("Announcing to discord...")
     await discord_announcer(ctx.bot)
     await ctx.edit_last_response("Announced to discord")
-
-
-@ls_twitter_group.child
-@lb.command("send", "Trigger a twitter announcement manually", auto_defer=True)
-@lb.implements(lb.SlashSubCommand)
-@utils.check_admin
-async def ls_twitter_announce(ctx: lb.Context):
-    await ctx.respond("Announcing to twitter...")
-    await twitter_announcer(ctx.app)
-    await ctx.edit_last_response("Announced to twitter")
-
-
-@ls_twitter_group.child
-@lb.option("date", "Date to check", default="")
-@lb.command(
-    "text",
-    "Get twitter text (makes it easy to copy)",
-    auto_defer=True,
-    pass_options=True,
-)
-@lb.implements(lb.SlashSubCommand)
-@utils.check_admin
-async def ls_twitter_text(ctx: lb.Context, date: str = ""):
-    if date:
-        date = dateparser.parse(date).replace(tzinfo=utc)
-    else:
-        date = dt.datetime.now(tz=utc)
-    await ctx.respond(content=f"```\n{(await get_twitter_data_tuple(date))[0]}\n```")
 
 
 @ls_group.child
@@ -482,99 +381,6 @@ async def ls_update(ctx: lb.MessageContext):
         await ctx.edit_last_response("Post updated")
 
 
-class TwitterHandler:
-    def __init__(self, twitter_v1: tweepy.API, twitter_v2: tweepy.Client) -> None:
-        self._twitter_v1 = twitter_v1
-        self._twitter_v2 = twitter_v2
-
-    @classmethod
-    def sign_in(cls) -> "TwitterHandler":
-        self = cls(
-            tweepy.API(
-                tweepy.OAuth1UserHandler(
-                    cfg.tw_cons_key,
-                    cfg.tw_cons_secret,
-                    cfg.tw_access_tok,
-                    cfg.tw_access_tok_secret,
-                ),
-                tweepy.Client(
-                    cfg.tw_bearer_tok,
-                    cfg.tw_cons_key,
-                    cfg.tw_cons_secret,
-                    cfg.tw_access_tok,
-                    cfg.tw_access_tok_secret,
-                ),
-            )
-        )
-        return self
-
-    async def announce_to_twitter(self, bot):
-        """Announce the lost sector to twitter
-
-        Bot must be passed so that errors are logged to discord"""
-        try:
-            tweet_string, file_name = await get_twitter_data_tuple()
-            await utils.run_in_thread_pool(
-                self._announce_to_twitter_sync,
-                tweet_string,
-                file_name,
-            )
-        except ValueError as err:
-            await utils.alert_owner(
-                err.args[0],
-                channel=cfg.alerts_channel,
-                bot=bot,
-                mention_mods=True,
-            )
-
-    def _announce_to_twitter_sync(self, tweet_string, attachment_file_name=None):
-        if len(tweet_string) > 280:
-            raise ValueError(
-                "Lost sector post Tweet length more than 280 characters, not posting"
-            )
-        # If we have a lost sector graphic, the file name will not be none
-        # or we can upload this graphic to twitter or use it
-        if attachment_file_name is not None:
-            # Upload the lost sector image
-            media_id = int(
-                self._twitter_v1.media_upload(
-                    filename=attachment_file_name,
-                ).media_id
-            )
-
-            # Use the lost sector image in the tweet
-            self._twitter_v2.create_tweet(text=tweet_string, media_ids=[media_id])
-        # If we don't have a lost sector graphic, we can't use it of course
-        # so we proceed with a text only tweet
-        else:
-            self._twitter_v1.update_status(
-                tweet_string,
-            )
-
-
-async def twitter_announcer(discord_bot: lb.BotApp, check_enabled=False):
-    backoff_timer = 60
-    while True:
-        try:
-            if (
-                check_enabled
-                and not await schemas.LostSectorPostSettings.get_twitter_enabled()
-            ):
-                return
-            logger.info("Announcing lost sector to discord")
-            await TwitterHandler().sign_in().announce_to_twitter(discord_bot)
-        except Exception as e:
-            e.add_note(
-                f"Failed to post to twitter, retrying in {backoff_timer/60} minutes"
-            )
-            logger.exception(e)
-            await aio.sleep(backoff_timer)
-            backoff_timer *= 2
-        else:
-            logger.info("Announced lost sector to twitter")
-            break
-
-
 async def on_start_schedule_autoposts(event: lb.LightbulbStartedEvent):
     # Run every day at 17:00 UTC
     @aiocron.crontab("0 17 * * *", start=True)
@@ -582,13 +388,6 @@ async def on_start_schedule_autoposts(event: lb.LightbulbStartedEvent):
     # @aiocron.crontab("* * * * *", start=True)
     async def autopost_ls():
         await discord_announcer(event.app, check_enabled=True)
-
-    # Run every day at 17:00 UTC
-    @aiocron.crontab("0 17 * * *", start=True)
-    # Use below crontab for testing to post every minute
-    # @aiocron.crontab("* * * * *", start=True)
-    async def autopost_ls_twitter():
-        await twitter_announcer(event.app, check_enabled=True)
 
 
 def register(bot: lb.BotApp) -> None:

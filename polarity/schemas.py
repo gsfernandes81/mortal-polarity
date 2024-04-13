@@ -39,21 +39,14 @@ class LostSectorPostSettings(Base):
         Boolean,
         default=True,
     )
-    twitter_autopost_enabled = Column(
-        "twitter_autopost_enabled",
-        Boolean,
-        default=False,
-    )
 
     def __init__(
         self,
         id: int = 1,
         discord_autopost_enabled=False,
-        twitter_autopost_enabled=False,
     ):
         self.id = id
         self.discord_autopost_enabled = discord_autopost_enabled
-        self.twitter_autopost_enabled = twitter_autopost_enabled
 
     @classmethod
     @utils.ensure_session(db_session)
