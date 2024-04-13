@@ -12,7 +12,10 @@ run-local: .env
 	poetry run honcho start
 
 recreate-schemas: .env
-	poetry run honcho run python -m polarity.schemas
+	poetry run honcho run python -m polarity.schemas --recreate-all
+
+atlas-migration-plans: .env
+	poetry run honcho run atlas migrate diff --env sqlalchemy
 
 test: .env
 	poetry run honcho run python -m pytest

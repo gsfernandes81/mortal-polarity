@@ -26,6 +26,7 @@ sqlalchemy = "^2.0.1"
 uvloop = "^0.17.0"
 yarl = "^1.9.2"
 dateparser = "^1.1.8"
+atlas-provider-sqlalchemy = "^0.1.5"
 
 [tool.poetry.dev-dependencies]
 rope = "*"

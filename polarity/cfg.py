@@ -27,11 +27,12 @@ def _getenv(var_name: str, default: t.Optional[str] = None) -> str:
     var = __getenv(var_name)
     if var is None:
         if default is not None:
-            print(f"Loaded {var_name} with default value {default}")
+            # print(f"Loaded {var_name} with default value {default}")
             return default
         raise ValueError(f"Environment variable {var_name} not set")
     else:
-        print(f"Loaded {var_name}")
+        # print(f"Loaded {var_name}")
+        pass
     return str(var)
 
 

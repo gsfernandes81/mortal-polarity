@@ -14,15 +14,16 @@
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio as aio
-import logging
+import sys
 
+from atlas_provider_sqlalchemy.ddl import print_ddl
 from sqlalchemy import Boolean, Integer
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.sql import select, update
 from sqlalchemy.sql.schema import Column
 
-from . import cfg, utils
+from polarity import cfg, utils
 
 Base = declarative_base()
 db_engine = create_async_engine(cfg.db_url_async, connect_args=cfg.db_connect_args)
@@ -99,4 +100,8 @@ async def recreate_all():
 
 
 if __name__ == "__main__":
-    aio.run(recreate_all())
+    if "--print-ddl" in sys.argv:
+        print_ddl("mysql", [Base])
+
+    if "--recreate-all" in sys.argv:
+        aio.run(recreate_all())
