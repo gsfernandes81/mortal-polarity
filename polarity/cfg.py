@@ -87,7 +87,14 @@ def _db_config():
         )
         ssl_ctx.verify_mode = ssl.CERT_REQUIRED
         db_connect_args.update({"ssl": ssl_ctx})
-    return db_session_kwargs, db_session_kwargs_sync, db_connect_args
+
+    db_engine_args = {
+        "max_overflow": -1,
+        "isolation_level": "READ COMMITTED",
+        "pool_pre_ping": True,
+        "pool_recycle": 3600,
+    }
+    return db_session_kwargs, db_session_kwargs_sync, db_connect_args, db_engine_args
 
 
 def _sheets_credentials(
@@ -146,14 +153,25 @@ gsheets_credentials = _sheets_credentials(
 )
 sheets_ls_url = _getenv("SHEETS_LS_URL")
 
+# Bungie credentials
+bungie_api_key = _getenv("BUNGIE_API_KEY")
+bungie_client_id = _getenv("BUNGIE_CLIENT_ID")
+bungie_client_secret = _getenv("BUNGIE_CLIENT_SECRET")
 
+
+port = int(_getenv("PORT", 8080))
 #### Environment variables end ####
 
 ###################################
 
 ####### Configs & constants #######
 
-db_session_kwargs, db_session_kwargs_sync, db_connect_args = _db_config()
+(
+    db_session_kwargs,
+    db_session_kwargs_sync,
+    db_connect_args,
+    db_engine_args,
+) = _db_config()
 lightbulb_params = _lightbulb_params()
 
 

@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
+
 import logging
 
 import hikari as h
@@ -21,7 +22,7 @@ import miru as m
 import uvloop
 from lightbulb.ext import tasks
 
-from . import cfg, controller, ls, posts, source
+from . import bungie_api, cfg, controller, ls, posts, source
 
 uvloop.install()
 bot: lb.BotApp = lb.BotApp(**cfg.lightbulb_params)
@@ -62,5 +63,6 @@ if __name__ == "__main__":
     source.register(bot)
     controller.register(bot)
     posts.register(bot)
+    bungie_api.register(bot)
     tasks.load(bot)
     bot.run()

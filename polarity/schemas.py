@@ -14,19 +14,23 @@
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio as aio
+import datetime as dt
 import sys
+import typing as t
 
 from atlas_provider_sqlalchemy.ddl import print_ddl
-from sqlalchemy import Boolean, Integer
+from sqlalchemy import VARCHAR, Boolean, DateTime, Integer
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy.sql import select, update
+from sqlalchemy.sql import insert, select, update
 from sqlalchemy.sql.schema import Column
 
 from polarity import cfg, utils
 
 Base = declarative_base()
-db_engine = create_async_engine(cfg.db_url_async, connect_args=cfg.db_connect_args)
+db_engine = create_async_engine(
+    cfg.db_url_async, connect_args=cfg.db_connect_args, **cfg.db_engine_args
+)
 db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
 
 
@@ -78,13 +82,69 @@ class LostSectorPostSettings(Base):
     async def set_discord_enabled(cls, enabled: bool, id: int = 1):
         return await cls._set_enabled("discord_autopost_enabled", enabled, id=id)
 
-    @classmethod
-    async def get_twitter_enabled(cls, id: int = 1):
-        return await cls._get_enabled("twitter_autopost_enabled", id=id)
+
+class BungieCredentials(Base):
+    __tablename__ = "bungie_credentials"
+    __mapper_args__ = {"eager_defaults": True}
+
+    id = Column("id", Integer, primary_key=True)
+    api_key = cfg.bungie_api_key
+    client_id = cfg.bungie_client_id
+    client_secret = cfg.bungie_client_secret
+    refresh_token = Column("refresh_token", VARCHAR(1024), default=None)
+    refresh_token_expires = Column("refresh_token_expires", DateTime, default=None)
+
+    def __init__(
+        self,
+        id: int = 1,
+        refresh_token=None,
+        refresh_token_expires=None,
+    ):
+        self.id = id
+        self.refresh_token = refresh_token
+        self.refresh_token_expires = refresh_token_expires
 
     @classmethod
-    async def set_twitter_enabled(cls, enabled: bool, id: int = 1):
-        return await cls._set_enabled("twitter_autopost_enabled", enabled, id=id)
+    @utils.ensure_session(db_session)
+    async def get_credentials(cls, id=1, session: AsyncSession = None) -> t.Self:
+        return (await session.execute(select(cls).where(cls.id == id))).scalar()
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def set_refresh_token(
+        cls,
+        id=1,
+        refresh_token=None,
+        refresh_token_expires=None,
+        session: AsyncSession = None,
+    ):
+        refresh_token_expires = dt.datetime.now() + dt.timedelta(
+            seconds=refresh_token_expires * 0.8  # 20% Factor of Safety
+        )
+
+        self: cls = (await session.execute(select(cls.id).where(cls.id == id))).scalar()
+
+        if self:
+            await session.execute(
+                update(cls)
+                .where(cls.id == id)
+                .values(
+                    {
+                        cls.refresh_token: refresh_token,
+                        cls.refresh_token_expires: refresh_token_expires,
+                    }
+                )
+            )
+        else:
+            await session.execute(
+                insert(cls).values(
+                    {
+                        cls.id: id,
+                        cls.refresh_token: refresh_token,
+                        cls.refresh_token_expires: refresh_token_expires,
+                    }
+                )
+            )
 
 
 async def recreate_all():

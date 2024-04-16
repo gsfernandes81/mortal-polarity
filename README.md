@@ -13,6 +13,15 @@ Running code locally:
 make run-local
 ```
 
+If running in WSL2 and testing bungie api functionality:
+Run the below in an admin powershell prompt to make sure the port for oauth
+authentication is forwarded
+```
+netsh interface portproxy add v4tov4 listenport=<external port> listenaddress=0.0.0.0 connectport=<internal port> connectaddress=<WSL2 IP address from hostname -I in WSL2>
+```
+And of course, set up forwarding on your router
+Also make sure ssl is set up correctly
+
 Running tests locally:
 
 ```

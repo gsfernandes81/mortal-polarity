@@ -1,3 +1,11 @@
+POETRY := $(shell command -v poetry 2> /dev/null)
+
+ifdef POETRY
+POETRY_CMD = poetry run
+else
+POETRY_CMD =
+endif
+
 deploy-dev:
 	railway environment dev
 	railway service mortal-polarity
@@ -9,16 +17,24 @@ deploy-prod:
 	railway up -d
 
 run-local: .env
-	poetry run honcho start
+	$(POETRY_CMD) honcho start
 
 recreate-schemas: .env
-	poetry run honcho run python -m polarity.schemas --recreate-all
+	$(POETRY_CMD) honcho run python -m polarity.schemas --recreate-all
 
-atlas-migration-plans: .env
-	poetry run honcho run atlas migrate diff --env sqlalchemy
+atlas-migration-plan: .env
+	$(POETRY_CMD) honcho run atlas migrate diff --env sqlalchemy
+
+atlas-migration-dry-run:
+	@echo "$(POETRY_CMD) honcho run atlas migrate apply -u <MYSQL_URL> --dry-run"
+	@$(POETRY_CMD) honcho run atlas migrate apply -u ${MYSQL_URL} --dry-run
+
+atlas-migration-apply:
+	@echo "$(POETRY_CMD) honcho run atlas migrate apply -u <MYSQL_URL>"
+	@$(POETRY_CMD) honcho run atlas migrate apply -u ${MYSQL_URL}
 
 test: .env
-	poetry run honcho run python -m pytest
+	$(POETRY_CMD) honcho run python -m pytest
 
 .env:
 	@echo "Please create a .env file with all variables as per polarity.cfg"
