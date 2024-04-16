@@ -43,6 +43,19 @@ def construct_emoji_substituter(
     return func
 
 
+async def substitute_user_side_emoji(bot: lb.BotApp, text: str) -> str:
+    """Substitutes user-side emoji with their respective mentions"""
+
+    guild = bot.cache.get_guild(
+        cfg.kyber_discord_server_id
+    ) or await bot.rest.fetch_guild(cfg.kyber_discord_server_id)
+
+    # Substitutes user-side emoji with their respective mentions
+    emoji_dict = {emoji.name: emoji for emoji in await guild.fetch_emojis()}
+
+    return re_user_side_emoji.sub(construct_emoji_substituter(emoji_dict), text)
+
+
 class InteractiveBuilderView(m.View):
     @staticmethod
     async def ask_user_for_properties(
@@ -144,18 +157,7 @@ class EmbedBuilderView(InteractiveBuilderView):
         )
         bot: lb.BotApp = ctx.bot
 
-        guild = bot.cache.get_guild(
-            cfg.kyber_discord_server_id
-        ) or await bot.rest.fetch_guild(cfg.kyber_discord_server_id)
-
-        # Substitutes user-side emoji with their respective mentions
-        emoji_dict = {emoji.name: emoji for emoji in await guild.fetch_emojis()}
-
-        description = re_user_side_emoji.sub(
-            construct_emoji_substituter(emoji_dict), description
-        )
-
-        embed.description = description
+        embed.description = await substitute_user_side_emoji(bot, description)
         await ctx.edit_response(embed=embed)
 
     @m.button(style=h.ButtonStyle.SECONDARY, label="Edit Color")

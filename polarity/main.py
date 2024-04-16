@@ -22,7 +22,7 @@ import miru as m
 import uvloop
 from lightbulb.ext import tasks
 
-from . import bungie_api, cfg, controller, ls, posts, source
+from . import bungie_api, cfg, controller, ls, posts, source, xur
 
 uvloop.install()
 bot: lb.BotApp = lb.BotApp(**cfg.lightbulb_params)
@@ -64,5 +64,6 @@ if __name__ == "__main__":
     controller.register(bot)
     posts.register(bot)
     bungie_api.register(bot)
+    xur.register(bot)
     tasks.load(bot)
     bot.run()
