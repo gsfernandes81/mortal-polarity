@@ -142,16 +142,16 @@ async def find_duplicate_uncrossposted_message(
 async def send_message(
     bot: lb.BotApp,
     msg_proto: HMessage,
+    channel_id: int,
     crosspost: bool = True,
     deduplicate: bool = False,
 ) -> h.Message:
-    channel = cfg.followables["lost_sector"]
     send_backoff = 10
     while True:
         try:
             channel: h.TextableGuildChannel = (
-                bot.cache.get_guild_channel(channel)
-                or await bot.rest.fetch_channel(channel)
+                bot.cache.get_guild_channel(channel_id)
+                or await bot.rest.fetch_channel(channel_id)
                 or None
             )
             msg = await channel.send(**msg_proto.to_message_kwargs())

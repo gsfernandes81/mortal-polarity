@@ -5,10 +5,12 @@ import aiohttp
 import hikari as h
 import lightbulb as lb
 from hmessage import HMessage
+from sector_accounting import xur as xur_support_data
 
 from . import bungie_api as api
 from . import cfg, schemas
 from .embeds import substitute_user_side_emoji
+from .ls import make_autopost_control_commands
 
 
 def xur_departure_string(post_date_time: dt.datetime | None = None) -> str:
@@ -28,14 +30,14 @@ def xur_departure_string(post_date_time: dt.datetime | None = None) -> str:
     # Convert to unix time
     xur_unix_departure_time = int(post_date_time.timestamp())
 
-    return f":time_k:  Xûr departs <t:{xur_unix_departure_time}:R>\n"
+    return f":timek:  Xûr departs <t:{xur_unix_departure_time}:R>\n"
 
 
-def xur_location_fragment(xur_location: str) -> str:
-    return (
-        "## **__Location__**\n"
-        f":location: [{xur_location}](https://www.google.com) WIP\n"
-    )
+def xur_location_fragment(
+    xur_location: str, xur_locations: xur_support_data.XurLocations
+) -> str:
+    xur_location = xur_locations[xur_location]
+    return f"## **__Location__**\n:location: {str(xur_location)}\n"
 
 
 def armor_stat_line_format(armor: api.DestinyArmor, simple_mode: bool = False) -> str:
@@ -111,7 +113,10 @@ def exotic_weapons_fragment(exotic_weapons: t.List[api.DestinyWeapon]) -> str:
     return exotic_weapons_fragment_
 
 
-def legendary_armor_fragement(legendary_armor_pieces: t.List[api.DestinyArmor]) -> str:
+def legendary_armor_fragement(
+    legendary_armor_pieces: t.List[api.DestinyArmor],
+    xur_armor_sets_data: xur_support_data.XurArmorSets,
+) -> str:
     armor_sets = set()
     for armor_piece in legendary_armor_pieces:
         armor_set_name = armor_piece.armor_set_name
@@ -123,7 +128,8 @@ def legendary_armor_fragement(legendary_armor_pieces: t.List[api.DestinyArmor]) 
     subfragments.append("")
 
     for armor_set_name in armor_sets:
-        subfragments.append(f":armor_k: [{armor_set_name}](https://www.google.com) WIP")
+        armor_set = xur_armor_sets_data[armor_set_name]
+        subfragments.append(f":armor: {armor_set}")
 
     subfragments.append("")
 
@@ -153,10 +159,20 @@ XUR_FOOTER = """\n\n[**View More**](https://kyber3000.com/D2-Xur) ↗
 Have a great weekend! :gscheer:"""
 
 
-async def format_xur_vendor(vendor: api.DestinyVendor, bot: lb.BotApp) -> HMessage:
+async def format_xur_vendor(
+    vendor: api.DestinyVendor,
+    bot: lb.BotApp = {},
+) -> HMessage:
+    xur_locations = xur_support_data.XurLocations.from_gspread_url(
+        cfg.sheets_ls_url, cfg.gsheets_credentials
+    )
+    xur_armor_sets = xur_support_data.XurArmorSets.from_gspread_url(
+        cfg.sheets_ls_url, cfg.gsheets_credentials
+    )
+
     description = "# [XÛR'S LOOT](https://kyber3000.com/D2-Xur)\n\n"
     description += xur_departure_string()
-    description += xur_location_fragment(vendor.location)
+    description += xur_location_fragment(vendor.location, xur_locations)
     description += exotic_armor_fragment(
         [item for item in vendor.sale_items if item.is_exotic and item.is_armor]
     )
@@ -164,7 +180,8 @@ async def format_xur_vendor(vendor: api.DestinyVendor, bot: lb.BotApp) -> HMessa
         [item for item in vendor.sale_items if item.is_exotic and item.is_weapon]
     )
     description += legendary_armor_fragement(
-        [item for item in vendor.sale_items if item.is_armor and item.is_legendary]
+        [item for item in vendor.sale_items if item.is_armor and item.is_legendary],
+        xur_armor_sets,
     )
     description += legendary_weapons_fragment(
         [item for item in vendor.sale_items if item.is_weapon and item.is_legendary]
@@ -185,15 +202,8 @@ async def format_xur_vendor(vendor: api.DestinyVendor, bot: lb.BotApp) -> HMessa
     return message
 
 
-@lb.command(
-    "xur",
-    "Xur info from the Bungie api",
-    guilds=[cfg.control_discord_server_id],
-    auto_defer=True,
-)
-@lb.implements(lb.SlashCommand)
-async def xur_command(ctx: lb.Context):
-    access_token = await api.refresh_api_tokens(ctx.app.d.webserver_runner)
+async def xur_message_constructor(bot: lb.BotApp) -> HMessage:
+    access_token = await api.refresh_api_tokens(bot.d.webserver_runner)
 
     async with aiohttp.ClientSession() as session:
         destiny_membership = await api.DestinyMembership.from_api(session, access_token)
@@ -209,9 +219,16 @@ async def xur_command(ctx: lb.Context):
         vendor_hash=api.XUR_VENDOR_HASH,
     )
 
-    message = await format_xur_vendor(xur, bot=ctx.app)
-    await ctx.respond(**message.to_message_kwargs())
+    return await format_xur_vendor(xur, bot=bot)
 
 
 def register(bot: lb.BotApp) -> None:
-    bot.command(xur_command)
+    bot.command(
+        make_autopost_control_commands(
+            autopost_name="xur",
+            enabled_getter=schemas.AutoPostSettings.get_xur_enabled,
+            enabled_setter=schemas.AutoPostSettings.set_xur,
+            channel_id=cfg.followables["xur"],
+            message_constructor_coro=xur_message_constructor,
+        )
+    )

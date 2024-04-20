@@ -132,8 +132,15 @@ def format_counts(
     )
 
 
+async def get_emoji_dict(bot: lb.BotApp):
+    guild = bot.cache.get_guild(
+        cfg.kyber_discord_server_id
+    ) or await bot.rest.fetch_guild(cfg.kyber_discord_server_id)
+    return {emoji.name: emoji for emoji in await guild.fetch_emojis()}
+
+
 async def format_sector(
-    emoji_dict: t.Dict[str, h.Emoji],
+    bot: lb.BotApp,
     date: dt.date = None,
     thumbnail: h.Attachment = None,
     secondary_image: h.Attachment = None,
@@ -141,6 +148,9 @@ async def format_sector(
     secondary_embed_description: str = "",
 ) -> HMessage:
     buffer = 1  # Minute
+
+    emoji_dict = await get_emoji_dict(bot)
+
     if date is None:
         date = dt.datetime.now(tz=utc) - dt.timedelta(hours=16, minutes=60 - buffer)
     else:
@@ -242,20 +252,19 @@ async def format_sector(
     return HMessage(embeds=embeds)
 
 
-async def discord_announcer(bot: lb.BotApp, check_enabled: bool = False):
+async def discord_announcer(
+    bot: lb.BotApp,
+    channel_id: int,
+    construct_message_coro: t.Coroutine[t.Any, t.Any, HMessage] = None,
+    check_enabled: bool = False,
+    enabled_check_coro: t.Coroutine[t.Any, t.Any, bool] = None,
+):
     while True:
         retries = 0
         try:
-            guild = bot.cache.get_guild(
-                cfg.kyber_discord_server_id
-            ) or await bot.rest.fetch_guild(cfg.kyber_discord_server_id)
-            emoji_dict = {emoji.name: emoji for emoji in await guild.fetch_emojis()}
-            if (
-                check_enabled
-                and not await schemas.LostSectorPostSettings.get_discord_enabled()
-            ):
+            if check_enabled and not await enabled_check_coro():
                 return
-            hmessage = await format_sector(emoji_dict=emoji_dict)
+            hmessage = await construct_message_coro(bot)
         except Exception as e:
             logger.exception(e)
             aio.sleep(2**retries)
@@ -263,7 +272,13 @@ async def discord_announcer(bot: lb.BotApp, check_enabled: bool = False):
             break
 
     logger.info("Announcing lost sector to discord")
-    await utils.send_message(bot, hmessage, crosspost=True, deduplicate=True)
+    await utils.send_message(
+        bot,
+        hmessage,
+        channel_id=channel_id,
+        crosspost=True,
+        deduplicate=True,
+    )
     logger.info("Announced lost sector to discord")
 
 
@@ -278,75 +293,78 @@ def sub_group(parent: lb.CommandLike, name: str, description: str):
     return _
 
 
-@lb.command(
-    "ls" if not cfg.test_env else "dev_ls",
-    "Commands for Kyber",
-    guilds=[cfg.control_discord_server_id],
-)
-@lb.implements(lb.SlashCommandGroup)
-def ls_group():
-    pass
+def make_autopost_control_commands(
+    autopost_name: str,
+    enabled_getter: t.Coroutine[t.Any, t.Any, bool],
+    enabled_setter: t.Coroutine[t.Any, t.Any, None],
+    channel_id: int,
+    message_constructor_coro: t.Coroutine[t.Any, t.Any, HMessage],
+) -> t.Callable:
+    @lb.command(
+        autopost_name if not cfg.test_env else "dev_" + autopost_name,
+        "Commands for Kyber",
+        guilds=[cfg.control_discord_server_id],
+    )
+    @lb.implements(lb.SlashCommandGroup)
+    def parent_group():
+        pass
 
-
-ls_discord_group = sub_group(
-    ls_group, "discord", "Discord lost sector announcement management"
-)
-
-
-@ls_discord_group.child
-@lb.option(
-    "option", "Enable or disable", str, choices=["Enable", "Disable"], required=True
-)
-@lb.command(
-    "auto",
-    "Enable or disable discord automatic lost sector announcements",
-    auto_defer=True,
-    pass_options=True,
-)
-@lb.implements(lb.SlashSubCommand)
-@utils.check_admin
-async def ls_discord_control(ctx: lb.Context, option: str):
-    option = True if option.lower() == "enable" else False
-    enabled = await schemas.LostSectorPostSettings.get_discord_enabled()
-    if option == enabled:
-        return await ctx.respond(
-            "Lost sector announcements are already {}".format(
-                "enabled" if option else "disabled"
+    @parent_group.child
+    @lb.option(
+        "option", "Enable or disable", str, choices=["Enable", "Disable"], required=True
+    )
+    @lb.command(
+        "auto",
+        "Enable or disable automated announcements",
+        auto_defer=True,
+        pass_options=True,
+    )
+    @lb.implements(lb.SlashSubCommand)
+    @utils.check_admin
+    async def autopost_control(ctx: lb.Context, option: str):
+        option = True if option.lower() == "enable" else False
+        enabled = await enabled_getter()
+        if option == enabled:
+            return await ctx.respond(
+                "{} announcements are already {}".format(
+                    autopost_name.capitalize(),
+                    "enabled" if option else "disabled",
+                )
             )
-        )
-    else:
-        await schemas.LostSectorPostSettings.set_discord_enabled(option)
-        await ctx.respond(
-            "Lost sector announcements now {}".format(
-                "Enabled" if option else "Disabled"
+        else:
+            await enabled_setter(enabled=option)
+            await ctx.respond(
+                "{} announcements now {}".format(
+                    autopost_name.capitalize(),
+                    "Enabled" if option else "Disabled",
+                )
             )
+
+    @parent_group.child
+    @lb.command("send", "Trigger a discord announcement manually", auto_defer=True)
+    @lb.implements(lb.SlashSubCommand)
+    @utils.check_admin
+    async def manual_announce(ctx: lb.Context):
+        await ctx.respond("Announcing to discord...")
+        await discord_announcer(
+            ctx.bot,
+            channel_id=channel_id,
+            check_enabled=False,
+            construct_message_coro=message_constructor_coro,
         )
+        await ctx.edit_last_response("Announced to discord")
 
+    @parent_group.child
+    @lb.command("show", "Check what the post will look like", auto_defer=True)
+    @lb.implements(lb.SlashSubCommand)
+    @utils.check_admin
+    async def show(ctx: lb.Context):
+        await ctx.respond("Checking...")
+        message: HMessage = await message_constructor_coro(ctx.app)
 
-@ls_discord_group.child
-@lb.command("send", "Trigger a discord announcement manually", auto_defer=True)
-@lb.implements(lb.SlashSubCommand)
-@utils.check_admin
-async def ls_discord_announce(ctx: lb.Context):
-    await ctx.respond("Announcing to discord...")
-    await discord_announcer(ctx.bot)
-    await ctx.edit_last_response("Announced to discord")
+        await ctx.edit_last_response(**message.to_message_kwargs())
 
-
-@ls_group.child
-@lb.command("today", "Check the latest lost sector information", auto_defer=True)
-@lb.implements(lb.SlashSubCommand)
-@utils.check_admin
-async def ls_today(ctx: lb.Context):
-    await ctx.respond("Checking lost sector information...")
-    guild = ctx.app.cache.get_guild(
-        cfg.kyber_discord_server_id
-    ) or await ctx.app.rest.fetch_guild(cfg.kyber_discord_server_id)
-    emoji_dict = {emoji.name: emoji for emoji in await guild.fetch_emojis()}
-
-    sector = await format_sector(emoji_dict=emoji_dict)
-
-    await ctx.edit_last_response(**sector.to_message_kwargs())
+    return parent_group
 
 
 @lb.command("ls_update", "Update a lost sector post", ephemeral=True, auto_defer=True)
@@ -361,8 +379,8 @@ async def ls_update(ctx: lb.MessageContext):
     msg_to_update: h.Message = ctx.options.target
 
     async with schemas.db_session() as session:
-        settings: schemas.LostSectorPostSettings = await session.get(
-            schemas.LostSectorPostSettings, 0
+        settings: schemas.AutoPostSettings = await session.get(
+            schemas.AutoPostSettings, 0
         )
         if settings is None:
             await ctx.respond("Please enable autoposts before using this cmd")
@@ -371,12 +389,7 @@ async def ls_update(ctx: lb.MessageContext):
 
         await ctx.edit_last_response("Updating post now")
 
-        guild = ctx.app.cache.get_guild(
-            cfg.kyber_discord_server_id
-        ) or await ctx.app.rest.fetch_guild(cfg.kyber_discord_server_id)
-        emoji_dict = {emoji.name: emoji for emoji in await guild.fetch_emojis()}
-
-        message = await format_sector(emoji_dict=emoji_dict)
+        message = await format_sector(ctx.app)
         await msg_to_update.edit(**message.to_message_kwargs())
         await ctx.edit_last_response("Post updated")
 
@@ -387,10 +400,24 @@ async def on_start_schedule_autoposts(event: lb.LightbulbStartedEvent):
     # Use below crontab for testing to post every minute
     # @aiocron.crontab("* * * * *", start=True)
     async def autopost_ls():
-        await discord_announcer(event.app, check_enabled=True)
+        await discord_announcer(
+            event.app,
+            channel_id=cfg.followables["lost_sector"],
+            check_enabled=True,
+            enabled_check_coro=schemas.AutoPostSettings.get_lost_sector_enabled,
+            construct_message_coro=format_sector,
+        )
 
 
 def register(bot: lb.BotApp) -> None:
-    bot.command(ls_group)
+    bot.command(
+        make_autopost_control_commands(
+            "ls",
+            schemas.AutoPostSettings.get_lost_sector_enabled,
+            schemas.AutoPostSettings.set_lost_sector,
+            cfg.followables["lost_sector"],
+            format_sector,
+        )
+    )
     bot.command(ls_update)
     bot.listen(lb.LightbulbStartedEvent)(on_start_schedule_autoposts)

@@ -1828,8 +1828,8 @@ pytz = "*"
 [package.source]
 type = "git"
 url = "https://github.com/gs729/sector_accounting.git"
-reference = "d147d78"
-resolved_reference = "d147d780a97532317e2ed5a82bbcd51040790344"
+reference = "47d2a93"
+resolved_reference = "47d2a9308c3e2de13d545aa3c01950b7d54107a1"
 
 [[package]]
 name = "shellingham"
@@ -2162,4 +2162,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.11.0"
-content-hash = "572e1c8a184d23056872b8110a41140b776af5c8d20dfdf81438f1a23e4dcb79"
+content-hash = "58649ddad09eaa3d3194fe253e6863671d46ebf9bd580be4a418411ee9db205b"

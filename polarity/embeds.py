@@ -43,16 +43,21 @@ def construct_emoji_substituter(
     return func
 
 
-async def substitute_user_side_emoji(bot: lb.BotApp, text: str) -> str:
+async def substitute_user_side_emoji(
+    bot_or_emoji_dict: lb.BotApp | t.Dict[str, h.Emoji], text: str
+) -> str:
     """Substitutes user-side emoji with their respective mentions"""
 
-    guild = bot.cache.get_guild(
-        cfg.kyber_discord_server_id
-    ) or await bot.rest.fetch_guild(cfg.kyber_discord_server_id)
+    if isinstance(bot_or_emoji_dict, h.GatewayBot):
+        guild = bot_or_emoji_dict.cache.get_guild(
+            cfg.kyber_discord_server_id
+        ) or await bot_or_emoji_dict.rest.fetch_guild(cfg.kyber_discord_server_id)
+
+        emoji_dict = {emoji.name: emoji for emoji in await guild.fetch_emojis()}
+    else:
+        emoji_dict = bot_or_emoji_dict
 
     # Substitutes user-side emoji with their respective mentions
-    emoji_dict = {emoji.name: emoji for emoji in await guild.fetch_emojis()}
-
     return re_user_side_emoji.sub(construct_emoji_substituter(emoji_dict), text)
 
 

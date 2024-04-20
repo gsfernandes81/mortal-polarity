@@ -34,13 +34,13 @@ db_engine = create_async_engine(
 db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
 
 
-class LostSectorPostSettings(Base):
-    __tablename__ = "lost_sector_post_settings"
+class AutoPostSettings(Base):
+    __tablename__ = "auto_post_settings"
     __mapper_args__ = {"eager_defaults": True}
 
-    id = Column("id", Integer, primary_key=True)
-    discord_autopost_enabled = Column(
-        "discord_autopost_enabled",
+    auto_post_name = Column("auto_post_name", VARCHAR(32), primary_key=True)
+    enabled = Column(
+        "enabled",
         Boolean,
         default=True,
     )
@@ -51,36 +51,55 @@ class LostSectorPostSettings(Base):
         discord_autopost_enabled=False,
     ):
         self.id = id
-        self.discord_autopost_enabled = discord_autopost_enabled
+        self.lost_sector_autopost_enabled = discord_autopost_enabled
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def _get_enabled(cls, prop: str, id: int = 1, session: AsyncSession = None):
+    async def get_enabled(cls, auto_post_name: str, session: AsyncSession = None):
         enabled = (
-            await session.execute(select(getattr(cls, prop)).where(cls.id == id))
+            await session.execute(
+                select(cls.enabled).where(cls.auto_post_name == auto_post_name)
+            )
         ).scalar()
-
-        if enabled is None:
-            self = cls(id=id)
-            session.add(self)
-            enabled = getattr(self, prop)
-
         return enabled
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def _set_enabled(
-        cls, prop: str, enabled: bool, id: int = 1, session: AsyncSession = None
+    async def set_enabled(
+        cls, auto_post_name: str, enabled: bool, session: AsyncSession = None
     ):
-        await session.execute(update(cls).where(cls.id == id).values({prop: enabled}))
+        currently_enabled = await cls.get_enabled(auto_post_name, session=session)
+
+        if currently_enabled == enabled:
+            return
+        elif currently_enabled is None:
+            await session.execute(
+                insert(cls).values(
+                    {cls.auto_post_name: auto_post_name, cls.enabled: enabled}
+                )
+            )
+        else:
+            await session.execute(
+                update(cls)
+                .values({cls.enabled: enabled})
+                .where(cls.auto_post_name == auto_post_name)
+            )
 
     @classmethod
-    async def get_discord_enabled(cls, id: int = 1):
-        return await cls._get_enabled("discord_autopost_enabled", id=id)
+    async def get_lost_sector_enabled(cls):
+        return await cls.get_enabled("lost_sector")
 
     @classmethod
-    async def set_discord_enabled(cls, enabled: bool, id: int = 1):
-        return await cls._set_enabled("discord_autopost_enabled", enabled, id=id)
+    async def set_lost_sector(cls, enabled: bool):
+        return await cls.set_enabled("lost_sector", enabled)
+
+    @classmethod
+    async def get_xur_enabled(cls):
+        return await cls.get_enabled("xur")
+
+    @classmethod
+    async def set_xur(cls, enabled: bool):
+        return await cls.set_enabled("xur", enabled)
 
 
 class BungieCredentials(Base):
