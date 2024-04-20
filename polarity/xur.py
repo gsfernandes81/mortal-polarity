@@ -35,7 +35,7 @@ def xur_departure_string(post_date_time: dt.datetime | None = None) -> str:
     # Convert to unix time
     xur_unix_departure_time = int(post_date_time.timestamp())
 
-    return f":timek:  Xûr departs <t:{xur_unix_departure_time}:R>\n"
+    return f":time:  Xûr departs <t:{xur_unix_departure_time}:R>\n"
 
 
 def xur_location_fragment(
