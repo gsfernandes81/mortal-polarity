@@ -764,10 +764,19 @@ def oauth_url():
     )
 
 
-async def check_bungie_api_online() -> bool:
+class APIOfflineException(Exception):
+    pass
+
+
+async def check_bungie_api_online(raise_exception: bool = False) -> bool:
     async with aiohttp.ClientSession() as session:
         async with session.get(f"{API_ROOT}/App/FirstParty") as response:
-            return response.json()["ErrorCode"] == 0
+            if response.json()["ErrorCode"] == 0:
+                return True
+            elif raise_exception:
+                raise APIOfflineException(response.json())
+            else:
+                return False
 
 
 def webserver_runner_preparation() -> aiohttp.web.AppRunner:

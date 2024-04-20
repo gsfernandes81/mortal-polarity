@@ -267,7 +267,8 @@ async def discord_announcer(
             hmessage = await construct_message_coro(bot)
         except Exception as e:
             logger.exception(e)
-            aio.sleep(2**retries)
+            retries += 1
+            await aio.sleep(min(2**retries, 300))
         else:
             break
 
@@ -299,6 +300,7 @@ def make_autopost_control_commands(
     enabled_setter: t.Coroutine[t.Any, t.Any, None],
     channel_id: int,
     message_constructor_coro: t.Coroutine[t.Any, t.Any, HMessage],
+    message_announcer_coro: t.Coroutine[t.Any, t.Any, None] = None,
 ) -> t.Callable:
     @lb.command(
         autopost_name if not cfg.test_env else "dev_" + autopost_name,
@@ -346,8 +348,8 @@ def make_autopost_control_commands(
     @utils.check_admin
     async def manual_announce(ctx: lb.Context):
         await ctx.respond("Announcing to discord...")
-        await discord_announcer(
-            ctx.bot,
+        await message_announcer_coro(
+            bot=ctx.bot,
             channel_id=channel_id,
             check_enabled=False,
             construct_message_coro=message_constructor_coro,
@@ -417,6 +419,7 @@ def register(bot: lb.BotApp) -> None:
             schemas.AutoPostSettings.set_lost_sector,
             cfg.followables["lost_sector"],
             format_sector,
+            discord_announcer,
         )
     )
     bot.command(ls_update)

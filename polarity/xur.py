@@ -1,4 +1,6 @@
+import asyncio as aio
 import datetime as dt
+import logging
 import typing as t
 
 import aiohttp
@@ -8,9 +10,11 @@ from hmessage import HMessage
 from sector_accounting import xur as xur_support_data
 
 from . import bungie_api as api
-from . import cfg, schemas
+from . import cfg, schemas, utils
 from .embeds import substitute_user_side_emoji
 from .ls import make_autopost_control_commands
+
+logger = logging.getLogger(__name__)
 
 
 def xur_departure_string(post_date_time: dt.datetime | None = None) -> str:
@@ -222,6 +226,65 @@ async def xur_message_constructor(bot: lb.BotApp) -> HMessage:
     return await format_xur_vendor(xur, bot=bot)
 
 
+async def xur_discord_announcer(
+    bot: lb.BotApp,
+    channel_id: int,
+    construct_message_coro: t.Coroutine[t.Any, t.Any, HMessage] = None,
+    check_enabled: bool = False,
+    enabled_check_coro: t.Coroutine[t.Any, t.Any, bool] = None,
+):
+    hmessage = HMessage(
+        embeds=[
+            h.Embed(
+                description="Waiting for Xur data from the API...",
+                color=cfg.embed_default_color,
+            )
+        ]
+    )
+    msg = await utils.send_message(
+        bot,
+        hmessage,
+        channel_id=channel_id,
+        crosspost=False,
+        deduplicate=True,
+    )
+
+    while True:
+        retries = 0
+        try:
+            if check_enabled and not await enabled_check_coro():
+                return
+
+            await api.check_bungie_api_online(raise_exception=True)
+
+            hmessage: HMessage = await construct_message_coro(bot)
+        except api.APIOfflineException as e:
+            logger.exception(e)
+            retries += 1
+            await aio.sleep(2 ** min(retries, 8))
+        except Exception as e:
+            logger.exception(e)
+            retries += 1
+            await aio.sleep(2 ** min(retries, 8))
+        else:
+            break
+
+    while True:
+        retries = 0
+        try:
+            if check_enabled and not await enabled_check_coro():
+                return
+            await msg.edit(**hmessage.to_message_kwargs())
+        except Exception as e:
+            logger.exception(e)
+            retries += 1
+            await aio.sleep(min(2**retries, 300))
+        else:
+            break
+
+    await utils.crosspost_message_with_retries(bot, channel_id, msg.id)
+
+
 def register(bot: lb.BotApp) -> None:
     bot.command(
         make_autopost_control_commands(
@@ -230,5 +293,6 @@ def register(bot: lb.BotApp) -> None:
             enabled_setter=schemas.AutoPostSettings.set_xur,
             channel_id=cfg.followables["xur"],
             message_constructor_coro=xur_message_constructor,
+            message_announcer_coro=xur_discord_announcer,
         )
     )

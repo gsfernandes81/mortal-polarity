@@ -19,7 +19,6 @@ import contextlib
 import datetime as dt
 import functools
 import logging
-import re
 import typing as t
 
 import aiofiles
@@ -41,7 +40,7 @@ class FeatureDisabledError(Exception):
 @contextlib.contextmanager
 def operation_timer(op_name, logger=logging.getLogger("main/" + __name__)):
     start_time = dt.datetime.now()
-    logger.info("Announce started".format(name=op_name))
+    logger.info("Announce started")
     yield lambda t: (t - start_time).total_seconds()
     end_time = dt.datetime.now()
     time_delta = end_time - start_time
@@ -139,6 +138,41 @@ async def find_duplicate_uncrossposted_message(
             return None
 
 
+async def crosspost_message_with_retries(
+    bot: lb.BotApp,
+    channel: h.GuildNewsChannel | int,
+    message_id: int,
+):
+    if isinstance(channel, int):
+        channel = bot.cache.get_guild_channel(channel) or await bot.rest.fetch_channel(
+            channel
+        )
+    if not isinstance(channel, h.GuildNewsChannel):
+        logging.warning(
+            "Attempted to crosspost a message in a non-news channel. Skipping..."
+        )
+        return
+    crosspost_backoff = 30
+    while True:
+        try:
+            await bot.rest.crosspost_message(channel.id, message_id)
+        except Exception as e:
+            if (
+                isinstance(e, h.BadRequestError)
+                and "This message has already been crossposted" in e.message
+            ):
+                # If the message has already been crossposted
+                # then we can ignore the error
+                break
+
+            e.add_note("Failed to publish message with exception\n")
+            logging.exception(e)
+            await aio.sleep(crosspost_backoff)
+            crosspost_backoff = crosspost_backoff * 2
+        else:
+            break
+
+
 async def send_message(
     bot: lb.BotApp,
     msg_proto: HMessage,
@@ -180,31 +214,11 @@ async def send_message(
             break
 
     if not crosspost:
-        return
+        return msg
 
-    if not isinstance(channel, h.GuildNewsChannel):
-        return
+    await crosspost_message_with_retries(bot, channel, msg)
 
-    # If the channel is a news channel then crosspost the message as well
-    crosspost_backoff = 30
-    while True:
-        try:
-            await bot.rest.crosspost_message(channel.id, msg.id)
-        except Exception as e:
-            if (
-                isinstance(e, h.BadRequestError)
-                and "This message has already been crossposted" in e.message
-            ):
-                # If the message has already been crossposted
-                # then we can ignore the error
-                break
-
-            e.add_note(f"Failed to publish lost sector with exception\n")
-            logging.exception(e)
-            await aio.sleep(crosspost_backoff)
-            crosspost_backoff = crosspost_backoff * 2
-        else:
-            break
+    return msg
 
 
 async def download_linked_image(url: str) -> t.Union[str, None]:
