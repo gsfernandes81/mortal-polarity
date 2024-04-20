@@ -3,6 +3,7 @@ import datetime as dt
 import logging
 import typing as t
 
+import aiocron
 import aiohttp
 import hikari as h
 import lightbulb as lb
@@ -283,6 +284,21 @@ async def xur_discord_announcer(
             break
 
     await utils.crosspost_message_with_retries(bot, channel_id, msg.id)
+
+
+async def on_start_schedule_autoposts(event: lb.LightbulbStartedEvent):
+    # Run every day at 17:00 UTC
+    @aiocron.crontab("0 17 * * FRI", start=True)
+    # Use below crontab for testing to post every minute
+    # @aiocron.crontab("* * * * *", start=True)
+    async def autopost_xur():
+        await xur_discord_announcer(
+            event.app,
+            channel_id=cfg.followables["lost_sector"],
+            check_enabled=True,
+            enabled_check_coro=schemas.AutoPostSettings.get_lost_sector_enabled,
+            construct_message_coro=xur_message_constructor,
+        )
 
 
 def register(bot: lb.BotApp) -> None:
