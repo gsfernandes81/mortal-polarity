@@ -774,11 +774,15 @@ class APIOfflineException(Exception):
 
 async def check_bungie_api_online(raise_exception: bool = False) -> bool:
     async with aiohttp.ClientSession() as session:
-        async with session.get(f"{API_ROOT}/App/FirstParty") as response:
-            if response.json()["ErrorCode"] == 0:
+        async with session.get(
+            f"{API_ROOT}/App/FirstParty",
+            headers={"X-API-Key": schemas.BungieCredentials.api_key},
+        ) as response:
+            response = await response.json()
+            if response["ErrorCode"] in [0, 1]:
                 return True
             elif raise_exception:
-                raise APIOfflineException(response.json())
+                raise APIOfflineException(response)
             else:
                 return False
 
