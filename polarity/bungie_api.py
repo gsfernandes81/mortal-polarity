@@ -834,7 +834,6 @@ def webserver_runner_preparation() -> aiohttp.web.AppRunner:
 async def _wait_for_token_from_login(
     runner: aiohttp.web.AppRunner,
 ) -> str:
-    print(oauth_url())
     print("Waiting for access token...")
     sys.stdout.flush()
 
@@ -861,9 +860,9 @@ async def refresh_api_tokens(
 
     bungie_credentials = await schemas.BungieCredentials.get_credentials()
     if not bungie_credentials:
-        raise ValueError("Bungie credentials are not set")
+        raise ValueError("Bungie credentials are not set, please log in")
     elif dt.datetime.now() > bungie_credentials.refresh_token_expires:
-        raise ValueError("Bungie credentials have expired")
+        raise ValueError("Bungie credentials have expired, please log in again")
 
     async with aiohttp.ClientSession() as session:
         async with session.post(
