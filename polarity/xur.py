@@ -327,7 +327,7 @@ async def on_start_schedule_autoposts(event: lb.LightbulbStartedEvent):
     async def autopost_xur():
         await xur_discord_announcer(
             event.app,
-            channel_id=cfg.followables["lost_sector"],
+            channel_id=cfg.followables["xur"],
             check_enabled=True,
             enabled_check_coro=schemas.AutoPostSettings.get_lost_sector_enabled,
             construct_message_coro=xur_message_constructor,
@@ -335,6 +335,7 @@ async def on_start_schedule_autoposts(event: lb.LightbulbStartedEvent):
 
 
 def register(bot: lb.BotApp) -> None:
+    bot.listen(lb.LightbulbStartedEvent)(on_start_schedule_autoposts)
     bot.command(
         make_autopost_control_commands(
             autopost_name="xur",
