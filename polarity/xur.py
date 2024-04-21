@@ -87,7 +87,9 @@ def exotic_armor_fragment(
     subfragments: t.List[str] = []
     for armor_piece in exotic_armor_pieces:
         subfragments.append(
-            f":{armor_piece.class_.lower().capitalize()}:  [{armor_piece.name} "
+            f":{armor_piece.class_.lower().capitalize()}:  "
+            + f"{armor_piece.class_.lower().capitalize()}: "
+            + f"[{armor_piece.name} "
             + f"({armor_piece.bucket})]({armor_piece.lightgg_url})\n"
             + armor_stat_line_format(armor_piece, allowed_emoji_list=allowed_emoji_list)
         )
