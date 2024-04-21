@@ -347,24 +347,33 @@ def make_autopost_control_commands(
     @lb.implements(lb.SlashSubCommand)
     @utils.check_admin
     async def manual_announce(ctx: lb.Context):
-        await ctx.respond("Announcing to discord...")
-        await message_announcer_coro(
-            bot=ctx.bot,
-            channel_id=channel_id,
-            check_enabled=False,
-            construct_message_coro=message_constructor_coro,
-        )
-        await ctx.edit_last_response("Announced to discord")
+        await ctx.respond("Announcing...")
+        try:
+            await message_announcer_coro(
+                bot=ctx.bot,
+                channel_id=channel_id,
+                check_enabled=False,
+                construct_message_coro=message_constructor_coro,
+            )
+        except Exception as e:
+            logger.exception(e)
+            await ctx.edit_last_response("An error occurred!\n" + str(e))
+        else:
+            await ctx.edit_last_response("Announced")
 
     @parent_group.child
     @lb.command("show", "Check what the post will look like", auto_defer=True)
     @lb.implements(lb.SlashSubCommand)
     @utils.check_admin
     async def show(ctx: lb.Context):
-        await ctx.respond("Checking...")
-        message: HMessage = await message_constructor_coro(ctx.app)
-
-        await ctx.edit_last_response(**message.to_message_kwargs())
+        await ctx.respond("Gathering data...")
+        try:
+            message: HMessage = await message_constructor_coro(ctx.app)
+        except Exception as e:
+            logger.exception(e)
+            await ctx.edit_last_response("An error occurred!\n" + str(e))
+        else:
+            await ctx.edit_last_response(**message.to_message_kwargs())
 
     return parent_group
 
