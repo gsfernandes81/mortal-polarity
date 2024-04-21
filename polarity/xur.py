@@ -60,25 +60,36 @@ def xur_location_fragment(
     return f"## **__Location__**\n:location: {str(xur_location)}\n"
 
 
-def armor_stat_line_format(armor: api.DestinyArmor, simple_mode: bool = False) -> str:
+def armor_stat_line_format(
+    armor: api.DestinyArmor,
+    simple_mode: bool = False,
+    allowed_emoji_list: t.List[str] = [],
+    default_emoji="rotate",
+) -> str:
     if simple_mode:
         return f"- Stat: {armor.stat_total}"
     stats = armor.stats
     stat_line = "- "
     for stat_name, stat_value in stats.items():
-        stat_line += f":rotate: {stat_value} "
+        stat_name = stat_name.lower()
+        if stat_name in allowed_emoji_list:
+            stat_line += f":{stat_name}: {stat_value} "
+        else:
+            stat_line += f":{default_emoji}: {stat_value} "
 
     stat_line += f"\n- Total: {armor.stat_total}"
     return stat_line
 
 
-def exotic_armor_fragment(exotic_armor_pieces: t.List[api.DestinyArmor]) -> str:
+def exotic_armor_fragment(
+    exotic_armor_pieces: t.List[api.DestinyArmor], allowed_emoji_list: t.List[str]
+) -> str:
     subfragments: t.List[str] = []
     for armor_piece in exotic_armor_pieces:
         subfragments.append(
             f":{armor_piece.class_.lower().capitalize()}:  [{armor_piece.name} "
             + f"({armor_piece.bucket})]({armor_piece.lightgg_url})\n"
-            + armor_stat_line_format(armor_piece)
+            + armor_stat_line_format(armor_piece, allowed_emoji_list=allowed_emoji_list)
         )
     return "## **__Exotic Armor__**\n" + "\n".join(subfragments) + "\n"
 
@@ -210,7 +221,8 @@ async def format_xur_vendor(
     description += xur_departure_string()
     description += xur_location_fragment(vendor.location, xur_locations)
     description += exotic_armor_fragment(
-        [item for item in vendor.sale_items if item.is_exotic and item.is_armor]
+        [item for item in vendor.sale_items if item.is_exotic and item.is_armor],
+        allowed_emoji_list=emoji_dict.keys(),
     )
     description += exotic_weapons_fragment(
         [item for item in vendor.sale_items if item.is_exotic and item.is_weapon],
