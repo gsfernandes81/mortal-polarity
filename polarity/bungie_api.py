@@ -458,6 +458,10 @@ class DestinyWeapon(DestinyItem):
             _perks.append(" / ".join(perk_group))
         return " + ".join(_perks)
 
+    @property
+    def expected_emoji_name(self) -> str:
+        return self.item_type_friendly_name.replace(" ", "_").replace("-", "_").lower()
+
 
 class DestinyArmor(DestinyItem):
     _tracked_stats = [

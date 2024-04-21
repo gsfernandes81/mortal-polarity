@@ -73,12 +73,16 @@ def weapon_line_format(
     include_weapon_type: bool,
     include_perks: t.List[int],
     include_lightgg_link: bool,
-    include_emoji: bool = True,
+    emoji_include_list: t.List[str] = ["weapon"],
+    default_emoji: str = "weapon",
 ) -> str:
     weapon_line = weapon.name
 
-    if include_emoji:
-        weapon_line = f":weapon: {weapon_line}"
+    if emoji_include_list:
+        if weapon.expected_emoji_name in emoji_include_list:
+            weapon_line = f":{weapon.expected_emoji_name}: {weapon_line}"
+        else:
+            weapon_line = f":{default_emoji}: {weapon_line}"
 
     if include_weapon_type:
         weapon_line += f" ({weapon.item_type_friendly_name})"
@@ -103,7 +107,9 @@ def weapon_line_format(
     return weapon_line
 
 
-def exotic_weapons_fragment(exotic_weapons: t.List[api.DestinyWeapon]) -> str:
+def exotic_weapons_fragment(
+    exotic_weapons: t.List[api.DestinyWeapon], emoji_include_list: t.List[str]
+) -> str:
     exotic_weapons_fragment_ = "## **__Exotic Weapons__**\n\n"
     for exotic_weapon in exotic_weapons:
         exotic_weapons_fragment_ += (
@@ -112,6 +118,7 @@ def exotic_weapons_fragment(exotic_weapons: t.List[api.DestinyWeapon]) -> str:
                 include_weapon_type=False if exotic_weapon.name == "Hawkmoon" else True,
                 include_perks=[1] if exotic_weapon.name == "Hawkmoon" else [],
                 include_lightgg_link=True,
+                emoji_include_list=emoji_include_list,
             )
             + "\n"
         )
@@ -141,7 +148,9 @@ def legendary_armor_fragement(
     return "\n".join(subfragments)
 
 
-def legendary_weapons_fragment(legendary_weapons: t.List[api.DestinyArmor]) -> str:
+def legendary_weapons_fragment(
+    legendary_weapons: t.List[api.DestinyArmor], emoji_include_list: t.List[str]
+) -> str:
     subfragments = []
     subfragments.append("## **__Legendary Weapons__**")
     subfragments.append("")
@@ -153,6 +162,7 @@ def legendary_weapons_fragment(legendary_weapons: t.List[api.DestinyArmor]) -> s
                 include_weapon_type=True,
                 include_perks=[-4, -3],
                 include_lightgg_link=True,
+                emoji_include_list=emoji_include_list,
             )
         )
 
@@ -175,6 +185,12 @@ async def format_xur_vendor(
         cfg.sheets_ls_url, cfg.gsheets_credentials
     )
 
+    guild = bot.cache.get_guild(
+        cfg.kyber_discord_server_id
+    ) or await bot.rest.fetch_guild(cfg.kyber_discord_server_id)
+
+    emoji_dict = {emoji.name: emoji for emoji in await guild.fetch_emojis()}
+
     description = "# [XÛR'S LOOT](https://kyber3000.com/D2-Xur)\n\n"
     description += xur_departure_string()
     description += xur_location_fragment(vendor.location, xur_locations)
@@ -182,18 +198,20 @@ async def format_xur_vendor(
         [item for item in vendor.sale_items if item.is_exotic and item.is_armor]
     )
     description += exotic_weapons_fragment(
-        [item for item in vendor.sale_items if item.is_exotic and item.is_weapon]
+        [item for item in vendor.sale_items if item.is_exotic and item.is_weapon],
+        emoji_include_list=emoji_dict.keys(),
     )
     description += legendary_armor_fragement(
         [item for item in vendor.sale_items if item.is_armor and item.is_legendary],
         xur_armor_sets,
     )
     description += legendary_weapons_fragment(
-        [item for item in vendor.sale_items if item.is_weapon and item.is_legendary]
+        [item for item in vendor.sale_items if item.is_weapon and item.is_legendary],
+        emoji_include_list=emoji_dict.keys(),
     )
 
     description += XUR_FOOTER
-    description = await substitute_user_side_emoji(bot, description)
+    description = await substitute_user_side_emoji(emoji_dict, description)
     message = HMessage(
         embeds=[
             h.Embed(
