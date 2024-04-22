@@ -22,6 +22,7 @@ import aiocron
 import aiohttp
 import hikari as h
 import lightbulb as lb
+import regex as re
 from hmessage import HMessage
 from sector_accounting import xur as xur_support_data
 
@@ -31,6 +32,8 @@ from .autopost import make_autopost_control_commands
 from .embeds import substitute_user_side_emoji
 
 logger = logging.getLogger(__name__)
+
+re_masterwork = re.compile("Tier [0-9]: ")
 
 
 def xur_departure_string(post_date_time: dt.datetime | None = None) -> str:
@@ -99,7 +102,9 @@ def exotic_armor_fragment(
 def weapon_line_format(
     weapon: api.DestinyWeapon,
     include_weapon_type: bool,
-    include_perks: t.List[int],
+    # Either a list of perk indices or a callable that returns a list of perk indices
+    # based on a list of perks
+    include_perks: t.List[int] | t.Callable,
     include_lightgg_link: bool,
     emoji_include_list: t.List[str] = ["weapon"],
     default_emoji: str = "weapon",
@@ -115,6 +120,8 @@ def weapon_line_format(
     if include_weapon_type:
         weapon_line += f" ({weapon.item_type_friendly_name})"
     if include_perks:
+        if callable(include_perks):
+            include_perks = include_perks(weapon.perks)
         perks = []
         for perk_index in include_perks:
             if perk_index >= len(weapon.perks):
@@ -176,6 +183,26 @@ def legendary_armor_fragement(
     return "\n".join(subfragments)
 
 
+def last_two_active_perk_columns(perks: t.List[t.List[str]]) -> t.List[int]:
+    perks_to_return = []
+    for i, perk in enumerate(perks):
+        if len(perk) == 0:
+            continue
+        elif len(perk) > 2:
+            perks_to_return.append(i)
+            continue
+        else:
+            perk = perk[0]
+            if not (
+                "shader" in perk.lower()
+                or "tracker" in perk.lower()
+                or re_masterwork.search(perk)
+            ):
+                perks_to_return.append(i)
+
+    return perks_to_return[-2:]
+
+
 def legendary_weapons_fragment(
     legendary_weapons: t.List[api.DestinyArmor], emoji_include_list: t.List[str]
 ) -> str:
@@ -188,7 +215,7 @@ def legendary_weapons_fragment(
             weapon_line_format(
                 weapon,
                 include_weapon_type=True,
-                include_perks=[-4, -3],
+                include_perks=last_two_active_perk_columns,
                 include_lightgg_link=True,
                 emoji_include_list=emoji_include_list,
             )
