@@ -119,6 +119,10 @@ def weapon_line_format(
 
     if include_weapon_type:
         weapon_line += f" ({weapon.item_type_friendly_name})"
+
+    if include_lightgg_link:
+        weapon_line = f"[{weapon_line}]({weapon.lightgg_url})"
+
     if include_perks:
         if callable(include_perks):
             include_perks = include_perks(weapon.perks)
@@ -135,9 +139,6 @@ def weapon_line_format(
 
         perks = ": " + ", ".join(perks)
         weapon_line += perks
-
-    if include_lightgg_link:
-        weapon_line = f"[{weapon_line}]({weapon.lightgg_url})"
 
     return weapon_line
 
