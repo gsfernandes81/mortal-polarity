@@ -272,7 +272,6 @@ async def format_xur_vendor(
     message = HMessage(
         embeds=[
             h.Embed(
-                title="WEEK 20",
                 description=description,
                 color=h.Color(cfg.embed_default_color),
                 url="https://kyberscorner.com",
