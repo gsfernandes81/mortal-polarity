@@ -72,15 +72,15 @@ def armor_stat_line_format(
     if simple_mode:
         return f"- Stat: {armor.stat_total}"
     stats = armor.stats
-    stat_line = "- "
+    stat_line = f"**Σ {armor.stat_total}**:"
     for stat_name, stat_value in stats.items():
         stat_name = stat_name.lower()
         if stat_name in allowed_emoji_list:
-            stat_line += f":{stat_name}: {stat_value} "
+            stat_line += f" :{stat_name}: `{stat_value}`"
         else:
-            stat_line += f":{default_emoji}: {stat_value} "
+            stat_line += f" :{default_emoji}: `{stat_value}` "
 
-    stat_line += f"\n- Total: {armor.stat_total}"
+    stat_line = stat_line + "\n"
     return stat_line
 
 
@@ -92,8 +92,8 @@ def exotic_armor_fragment(
         subfragments.append(
             f":{armor_piece.class_.lower().capitalize()}:  "
             + f"{armor_piece.class_.lower().capitalize()}: "
-            + f"[{armor_piece.name} "
-            + f"({armor_piece.bucket})]({armor_piece.lightgg_url})\n"
+            + f"[**{armor_piece.name} "
+            + f"({armor_piece.bucket})**]({armor_piece.lightgg_url})\n"
             + armor_stat_line_format(armor_piece, allowed_emoji_list=allowed_emoji_list)
         )
     return "## **__Exotic Armor__**\n" + "\n".join(subfragments) + "\n"
