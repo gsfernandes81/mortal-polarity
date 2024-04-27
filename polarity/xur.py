@@ -80,7 +80,6 @@ def armor_stat_line_format(
         else:
             stat_line += f" :{default_emoji}: `{stat_value}` "
 
-    stat_line = stat_line + "\n"
     return stat_line
 
 
@@ -96,7 +95,7 @@ def exotic_armor_fragment(
             + f"({armor_piece.bucket})**]({armor_piece.lightgg_url})\n"
             + armor_stat_line_format(armor_piece, allowed_emoji_list=allowed_emoji_list)
         )
-    return "## **__Exotic Armor__**\n" + "\n".join(subfragments) + "\n"
+    return "## **__Exotic Armor__**\n" + "\n\n".join(subfragments) + "\n"
 
 
 def weapon_line_format(
