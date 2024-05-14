@@ -60,7 +60,7 @@ def xur_location_fragment(
     xur_location: str, xur_locations: xur_support_data.XurLocations
 ) -> str:
     xur_location = xur_locations[xur_location]
-    return f"## **__Location__**\n:location: {str(xur_location)}\n"
+    return f"## **__Location__**\n:location: **{str(xur_location)}**\n"
 
 
 def armor_stat_line_format(
@@ -109,6 +109,7 @@ def weapon_line_format(
     default_emoji: str = "weapon",
 ) -> str:
     weapon_line = weapon.name
+    weapon_line = f"**{weapon_line}**"
 
     if emoji_include_list:
         if weapon.expected_emoji_name in emoji_include_list:
@@ -176,7 +177,7 @@ def legendary_armor_fragement(
 
     for armor_set_name in armor_sets:
         armor_set = xur_armor_sets_data[armor_set_name]
-        subfragments.append(f":armor: {armor_set}")
+        subfragments.append(f":armor: **{armor_set}**")
 
     subfragments.append("")
 
@@ -214,7 +215,7 @@ def legendary_weapons_fragment(
         subfragments.append(
             weapon_line_format(
                 weapon,
-                include_weapon_type=True,
+                include_weapon_type=False,
                 include_perks=last_two_active_perk_columns,
                 include_lightgg_link=True,
                 emoji_include_list=emoji_include_list,
