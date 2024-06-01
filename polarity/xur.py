@@ -109,6 +109,10 @@ def weapon_line_format(
     default_emoji: str = "weapon",
 ) -> str:
     weapon_line = weapon.name
+
+    if include_weapon_type:
+        weapon_line += f" ({weapon.item_type_friendly_name})"
+
     weapon_line = f"**{weapon_line}**"
 
     if emoji_include_list:
@@ -116,9 +120,6 @@ def weapon_line_format(
             weapon_line = f":{weapon.expected_emoji_name}: {weapon_line}"
         else:
             weapon_line = f":{default_emoji}: {weapon_line}"
-
-    if include_weapon_type:
-        weapon_line += f" ({weapon.item_type_friendly_name})"
 
     if include_lightgg_link:
         weapon_line = f"[{weapon_line}]({weapon.lightgg_url})"
