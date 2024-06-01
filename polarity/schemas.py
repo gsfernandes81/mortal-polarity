@@ -38,7 +38,7 @@ class AutoPostSettings(Base):
     __tablename__ = "auto_post_settings"
     __mapper_args__ = {"eager_defaults": True}
 
-    auto_post_name = Column("auto_post_name", VARCHAR(32), primary_key=True)
+    name = Column("name", VARCHAR(32), primary_key=True)
     enabled = Column(
         "enabled",
         Boolean,
@@ -57,9 +57,7 @@ class AutoPostSettings(Base):
     @utils.ensure_session(db_session)
     async def get_enabled(cls, auto_post_name: str, session: AsyncSession = None):
         enabled = (
-            await session.execute(
-                select(cls.enabled).where(cls.auto_post_name == auto_post_name)
-            )
+            await session.execute(select(cls.enabled).where(cls.name == auto_post_name))
         ).scalar()
         return enabled
 
@@ -74,15 +72,13 @@ class AutoPostSettings(Base):
             return
         elif currently_enabled is None:
             await session.execute(
-                insert(cls).values(
-                    {cls.auto_post_name: auto_post_name, cls.enabled: enabled}
-                )
+                insert(cls).values({cls.name: auto_post_name, cls.enabled: enabled})
             )
         else:
             await session.execute(
                 update(cls)
                 .values({cls.enabled: enabled})
-                .where(cls.auto_post_name == auto_post_name)
+                .where(cls.name == auto_post_name)
             )
 
     @classmethod
@@ -92,6 +88,14 @@ class AutoPostSettings(Base):
     @classmethod
     async def set_lost_sector(cls, enabled: bool):
         return await cls.set_enabled("lost_sector", enabled)
+
+    @classmethod
+    async def get_lost_sector_legendary_weapons_enabled(cls):
+        return await cls.get_enabled("lost_sector_legendary_weapons")
+
+    @classmethod
+    async def set_lost_sector_legendary_weapons(cls, enabled: bool):
+        return await cls.set_enabled("lost_sector_legendary_weapons", enabled)
 
     @classmethod
     async def get_xur_enabled(cls):

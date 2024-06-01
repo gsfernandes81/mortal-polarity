@@ -14,7 +14,6 @@
 # mortal-polarity. If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio as aio
-import datetime as dt
 import logging
 import typing as t
 
@@ -23,7 +22,6 @@ import hikari as h
 import lightbulb as lb
 from aiohttp import InvalidURL
 from hmessage import HMessage
-from pytz import utc
 from sector_accounting.sector_accounting import (
     DifficultySpecificSectorData,
     Rotation,
@@ -142,20 +140,8 @@ async def get_emoji_dict(bot: lb.BotApp):
 
 async def format_sector(
     bot: lb.BotApp,
-    date: dt.date = None,
-    thumbnail: h.Attachment = None,
-    secondary_image: h.Attachment = None,
-    secondary_embed_title: str = "",
-    secondary_embed_description: str = "",
 ) -> HMessage:
-    buffer = 1  # Minute
-
     emoji_dict = await get_emoji_dict(bot)
-
-    if date is None:
-        date = dt.datetime.now(tz=utc) - dt.timedelta(hours=16, minutes=60 - buffer)
-    else:
-        date = date + dt.timedelta(minutes=buffer)
     sector: Sector = Rotation.from_gspread_url(
         cfg.sheets_ls_url, cfg.gsheets_credentials, buffer=5
     )()
@@ -227,30 +213,18 @@ async def format_sector(
             + f"{utils.space.three_per_em}{sector.to_sector_v1().modifiers}"
             + f"\n{overcharged_weapon_emoji}{utils.space.three_per_em}Overcharged {sector.overcharged_weapon}",
         )
-        .add_field(
+    )
+
+    if await schemas.AutoPostSettings.get_lost_sector_legendary_weapons_enabled():
+        embed.add_field(
             "Legendary Weapons (If-Solo)",
             legendary_weapon_rewards,
         )
-    )
 
     if ls_gfx_url:
         embed.set_image(ls_gfx_url)
 
-    if thumbnail:
-        embed.set_thumbnail(thumbnail)
-
-    if secondary_image:
-        embed2 = h.Embed(
-            title=secondary_embed_title,
-            description=secondary_embed_description,
-            color=cfg.embed_default_color,
-        )
-        embed2.set_image(secondary_image)
-        embeds = [embed, embed2]
-    else:
-        embeds = [embed]
-
-    return HMessage(embeds=embeds)
+    return HMessage(embeds=[embed])
 
 
 async def discord_announcer(
@@ -282,6 +256,37 @@ async def discord_announcer(
         deduplicate=True,
     )
     logger.info("Announced lost sector to discord")
+
+
+@lb.option(
+    "option", "Enable or disable", str, choices=["Enable", "Disable"], required=True
+)
+@lb.command(
+    "legendary_weapons",
+    "Control lost sector legendary weapon announcements",
+    auto_defer=True,
+    pass_options=True,
+)
+@lb.implements(lb.SlashSubCommand)
+async def control_legendary_weapons(ctx: lb.Context, option: str):
+    """Enable or disable lost sector legendary weapon announcements"""
+
+    desired_setting: bool = True if option.lower() == "enable" else False
+    current_setting = (
+        await schemas.AutoPostSettings.get_lost_sector_legendary_weapons_enabled()
+    )
+
+    if desired_setting == current_setting:
+        return await ctx.respond(
+            f"Lost sector legendary weapon announcements are already {'enabled' if desired_setting else 'disabled'}"
+        )
+
+    await schemas.AutoPostSettings.set_lost_sector_legendary_weapons(
+        enabled=desired_setting
+    )
+    await ctx.respond(
+        f"Lost sector legendary weapon announcements now {'enabled' if desired_setting else 'disabled'}"
+    )
 
 
 def sub_group(parent: lb.CommandLike, name: str, description: str):
@@ -338,15 +343,18 @@ async def on_start_schedule_autoposts(event: lb.LightbulbStartedEvent):
 
 
 def register(bot: lb.BotApp) -> None:
-    bot.command(
-        make_autopost_control_commands(
-            "ls",
-            schemas.AutoPostSettings.get_lost_sector_enabled,
-            schemas.AutoPostSettings.set_lost_sector,
-            cfg.followables["lost_sector"],
-            format_sector,
-            discord_announcer,
-        )
+    autopost_control_parent_group = make_autopost_control_commands(
+        "ls",
+        schemas.AutoPostSettings.get_lost_sector_enabled,
+        schemas.AutoPostSettings.set_lost_sector,
+        cfg.followables["lost_sector"],
+        format_sector,
+        discord_announcer,
     )
+
+    autopost_control_parent_group.child(control_legendary_weapons)
+
+    bot.command(autopost_control_parent_group)
+
     bot.command(ls_update)
     bot.listen(lb.LightbulbStartedEvent)(on_start_schedule_autoposts)
