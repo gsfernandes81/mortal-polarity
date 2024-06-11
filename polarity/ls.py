@@ -124,7 +124,7 @@ def format_counts(
         data_strings.append(data_string)
 
     return (
-        f"Legend:{utils.space.figure}"
+        f"Expert:{utils.space.figure}"
         + data_strings[0]
         + f"\nMaster:{utils.space.hair}{utils.space.figure}"
         + data_strings[1]
