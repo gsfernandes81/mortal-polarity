@@ -20,6 +20,7 @@ import typing as t
 
 import aiocron
 import aiohttp
+import aiohttp.web
 import hikari as h
 import lightbulb as lb
 import regex as re
@@ -83,6 +84,34 @@ def armor_stat_line_format(
     return stat_line
 
 
+def costs_string_from_items(
+    destiny_items: t.List[api.DestinyItem],
+    emoji_include_list: t.List[str] = [],
+) -> str:
+    costs: t.Set[dict] = {
+        destiny_item.costs for destiny_item in destiny_items if destiny_item.costs
+    }
+
+    if not costs:
+        return ""
+
+    costs_line = ""
+    if len(costs) == 1:
+        # exotic_weapons_fragment_ +=
+        for currency, amount in costs.pop().items():
+            emoji_name = api.likely_emoji_name(currency)
+            if emoji_name not in emoji_include_list:
+                costs_line = f"{costs_line}{currency}: {amount} "
+            else:
+                costs_line = f"{costs_line}:{emoji_name}: {amount} "
+    elif len(costs) > 1:
+        costs_line = "Costs vary per item"
+
+    costs_line += "\n"
+
+    return costs_line
+
+
 def exotic_armor_fragment(
     exotic_armor_pieces: t.List[api.DestinyArmor], allowed_emoji_list: t.List[str]
 ) -> str:
@@ -95,7 +124,12 @@ def exotic_armor_fragment(
             + f"({armor_piece.bucket})**]({armor_piece.lightgg_url})\n"
             + armor_stat_line_format(armor_piece, allowed_emoji_list=allowed_emoji_list)
         )
-    return "## **__Exotic Armor__**\n" + "\n\n".join(subfragments) + "\n"
+    return (
+        "## **__Exotic Armor__**\n"
+        + costs_string_from_items(exotic_armor_pieces, allowed_emoji_list)
+        + "\n\n".join(subfragments)
+        + "\n"
+    )
 
 
 def weapon_line_format(
@@ -145,9 +179,15 @@ def weapon_line_format(
 
 
 def exotic_weapons_fragment(
-    exotic_weapons: t.List[api.DestinyWeapon], emoji_include_list: t.List[str]
+    exotic_weapons: t.List[api.DestinyWeapon],
+    emoji_include_list: t.List[str],
 ) -> str:
     exotic_weapons_fragment_ = "## **__Exotic Weapons__**\n\n"
+
+    exotic_weapons_fragment_ += costs_string_from_items(
+        exotic_weapons, emoji_include_list
+    )
+
     for exotic_weapon in exotic_weapons:
         exotic_weapons_fragment_ += (
             weapon_line_format(
@@ -162,9 +202,34 @@ def exotic_weapons_fragment(
     return exotic_weapons_fragment_
 
 
+def exotic_catalysts_fragment(
+    exotic_catalysts: t.List[api.DestinyItem], emoji_include_list: t.List[str]
+) -> str:
+    exotic_catalysts_fragment_ = "## **__Exotic Catalysts__**\n\n"
+
+    exotic_catalysts_fragment_ += costs_string_from_items(
+        exotic_catalysts, emoji_include_list
+    )
+
+    for exotic_catalyst in exotic_catalysts:
+        exotic_catalysts_fragment_ += (
+            weapon_line_format(
+                exotic_catalyst,
+                include_weapon_type=False,
+                include_perks=[],
+                include_lightgg_link=True,
+                emoji_include_list=emoji_include_list,
+                default_emoji="exotic_catalyst",
+            )
+            + "\n"
+        )
+    return exotic_catalysts_fragment_
+
+
 def legendary_armor_fragement(
     legendary_armor_pieces: t.List[api.DestinyArmor],
     xur_armor_sets_data: xur_support_data.XurArmorSets,
+    emoji_include_list: t.List[str] = [],
 ) -> str:
     armor_sets = set()
     for armor_piece in legendary_armor_pieces:
@@ -174,6 +239,11 @@ def legendary_armor_fragement(
 
     subfragments = []
     subfragments.append("## **__Legendary Armor__**")
+    subfragments.append(
+        costs_string_from_items(legendary_armor_pieces, emoji_include_list).replace(
+            "\n", ""
+        )
+    )
     subfragments.append("")
 
     for armor_set_name in armor_sets:
@@ -210,6 +280,11 @@ def legendary_weapons_fragment(
 ) -> str:
     subfragments = []
     subfragments.append("## **__Legendary Weapons__**")
+
+    subfragments.append(
+        costs_string_from_items(legendary_weapons, emoji_include_list).replace("\n", "")
+    )
+
     subfragments.append("")
 
     for weapon in legendary_weapons:
@@ -259,9 +334,14 @@ async def format_xur_vendor(
         [item for item in vendor.sale_items if item.is_exotic and item.is_weapon],
         emoji_include_list=emoji_dict.keys(),
     )
+    description += exotic_catalysts_fragment(
+        [item for item in vendor.sale_items if item.is_exotic and item.is_catalyst],
+        emoji_include_list=emoji_dict.keys(),
+    )
     description += legendary_armor_fragement(
         [item for item in vendor.sale_items if item.is_armor and item.is_legendary],
         xur_armor_sets,
+        emoji_include_list=emoji_dict.keys(),
     )
     description += legendary_weapons_fragment(
         [item for item in vendor.sale_items if item.is_weapon and item.is_legendary],
@@ -282,23 +362,38 @@ async def format_xur_vendor(
     return message
 
 
-async def xur_message_constructor(bot: lb.BotApp) -> HMessage:
-    access_token = await api.refresh_api_tokens(bot.d.webserver_runner)
+async def fetch_xur_data(webserver_runner: aiohttp.web.AppRunner) -> api.DestinyVendor:
+    access_token = await api.refresh_api_tokens(webserver_runner)
 
     async with aiohttp.ClientSession() as session:
         destiny_membership = await api.DestinyMembership.from_api(session, access_token)
         character_id = await destiny_membership.get_character_id(session, access_token)
 
+    manifest_table = await api._build_manifest_dict(
+        await api._get_latest_manifest(schemas.BungieCredentials.api_key)
+    )
+
     xur: api.DestinyVendor = await api.DestinyVendor.request_from_api(
         destiny_membership=destiny_membership,
         character_id=character_id,
         access_token=access_token,
-        manifest_table=await api._build_manifest_dict(
-            await api._get_latest_manifest(schemas.BungieCredentials.api_key)
-        ),
+        manifest_table=manifest_table,
         vendor_hash=api.XUR_VENDOR_HASH,
     )
 
+    xur += await api.DestinyVendor.request_from_api(
+        destiny_membership=destiny_membership,
+        character_id=character_id,
+        access_token=access_token,
+        manifest_table=manifest_table,
+        vendor_hash=api.XUR_STRANGE_GEAR_VENDOR_HASH,
+    )
+
+    return xur
+
+
+async def xur_message_constructor(bot: lb.BotApp) -> HMessage:
+    xur = await fetch_xur_data(bot.d.webserver_runner)
     return await format_xur_vendor(xur, bot=bot)
 
 
@@ -388,3 +483,8 @@ def register(bot: lb.BotApp) -> None:
             message_announcer_coro=xur_discord_announcer,
         )
     )
+
+
+if __name__ == "__main__":
+    xur = aio.run(fetch_xur_data(api.webserver_runner_preparation()))
+    print(xur)

@@ -41,6 +41,7 @@ API_VENDORS_AUTHENTICATED = (
     + "/?components={components}"
 )
 XUR_VENDOR_HASH = 2190858386
+XUR_STRANGE_GEAR_VENDOR_HASH = 3751514131
 
 ARMOR_TYPE_NAMES = (
     "Helmet",
@@ -56,13 +57,13 @@ DESTINY_CLASSES_ENUM = ("Titan", "Hunter", "Warlock")
 
 components = (
     # "300,"  # DestinyComponentType.ItemInstances
-    # "302,"  # DestinyComponentType.ItemPerks
+    "302,"  # DestinyComponentType.ItemPerks
+    "304,"  # DestinyComponentType.ItemStats
     # "305,"  # DestinyComponentType.ItemSockets
     # "306,"  # DestinyComponentType.ItemTalentGrids
     # "307,"  # DestinyComponentType.ItemCommonData
     # "308,"  # DestinyComponentType.ItemPlugStates
-    "304,"
-    "310,"  # DestinyComponentType.ItemReusablePlugs
+    # "310,"  # DestinyComponentType.ItemReusablePlugs
     "400,"  # DestinyComponentType.Vendors
     "402"  # DestinyComponentType.VendorSales
 )
@@ -72,7 +73,7 @@ manifest_table_names = [
     # "DestinyClassDefinition",
     # "DestinyPlaceDefinition",
     # "DestinyPlugSetDefinition",
-    # "DestinySandboxPerkDefinition",
+    "DestinySandboxPerkDefinition",
     "DestinyStatDefinition",
     # "DestinyStatGroupDefinition",
     "DestinyEquipmentSlotDefinition",
@@ -86,6 +87,10 @@ manifest_table_names = [
 
 DESTINY_ITEM_TYPE_WEAPON = 3
 DESTINY_ITEM_TYPE_ARMOR = 2
+
+
+def likely_emoji_name(name: str) -> str:
+    return name.replace(" ", "_").replace("-", "_").lower()
 
 
 class OAuthStateManager:
@@ -300,7 +305,9 @@ class DestinyItem:
     def from_sale_item(
         cls,
         sale_item: dict,
-        reusable_plugs: dict,
+        # reusable_plugs: dict,
+        stats: dict,
+        perks: dict,
         manifest_table: dict,
     ):
         hash_ = sale_item["itemHash"]
@@ -342,9 +349,26 @@ class DestinyItem:
             else None
         )
 
-        cls = cls.get_appropriate_subclass(item_type)
+        costs_data = sale_item.get("costs", [])
+        costs = {}
+        for cost in costs_data:
+            item_hash = cost.get("itemHash", 0)
+            quantity = cost.get("quantity", 0)
+            if item_hash:
+                item_name = (
+                    manifest_table["DestinyInventoryItemDefinition"]
+                    .get(item_hash, {})
+                    .get("displayProperties", {})
+                    .get("name", "")
+                )
 
-        return cls(
+            else:
+                item_name = ""
+            if item_name:
+                costs[item_name] = quantity
+
+        cls = cls.get_appropriate_subclass(item_type)
+        self: t.Self = cls(
             name=name,
             hash_=hash_,
             rarity=rarity,
@@ -353,7 +377,12 @@ class DestinyItem:
             item_type=item_type,
             item_type_friendly_name=item_type_friendly_name,
             collectible_set_name=collectible_set_name,
-        ).with_reusable_plugs(plugs=reusable_plugs, manifest_table=manifest_table)
+            costs=costs,
+        )
+        self: t.Self = self.with_stats(stats, manifest_table)
+        self: t.Self = self.with_perks(perks, manifest_table)
+
+        return self
 
     def __init__(
         self,
@@ -365,6 +394,7 @@ class DestinyItem:
         item_type: int,
         item_type_friendly_name: str,
         collectible_set_name: str = None,
+        costs: t.Dict[str, int] = {},
     ):
         self.name = name
         self.hash = hash_
@@ -374,6 +404,7 @@ class DestinyItem:
         self.item_type = item_type
         self.item_type_friendly_name = item_type_friendly_name
         self.collectible_set_name = collectible_set_name
+        self.costs = costs
 
     def __repr__(self):
         return (
@@ -383,7 +414,7 @@ class DestinyItem:
         )
 
     @staticmethod
-    def get_appropriate_subclass(item_type: int):
+    def get_appropriate_subclass(item_type: int) -> t.Type[t.Self]:
         if item_type == DESTINY_ITEM_TYPE_WEAPON:
             return DestinyWeapon
         elif item_type == DESTINY_ITEM_TYPE_ARMOR:
@@ -400,6 +431,10 @@ class DestinyItem:
         return self.item_type == DESTINY_ITEM_TYPE_WEAPON
 
     @property
+    def is_catalyst(self) -> bool:
+        return "catalyst" in self.name.lower()
+
+    @property
     def is_exotic(self) -> bool:
         return self.rarity == "Exotic"
 
@@ -411,18 +446,87 @@ class DestinyItem:
     def lightgg_url(self) -> str:
         return f"https://light.gg/db/items/{self.hash}"
 
-    def with_reusable_plugs(self, plugs: t.List[dict], manifest_table: dict):
+    @property
+    def expected_emoji_name(self) -> str:
+        return likely_emoji_name(self.item_type_friendly_name)
+
+    def with_reusable_plugs(self, plugs: t.Dict[str, list], manifest_table: dict):
         return self
+
+    def with_stats(
+        self,
+        stats: t.Dict[str, t.Dict[str, int]]
+        | t.Dict[str, t.Dict[str, t.Dict[str, int]]],
+        manifest_table: dict,
+    ) -> t.Self:
+        self._stats = {}
+
+        if not stats:
+            return self
+
+        if "stats" in stats:
+            stats = stats["stats"]
+
+        for stat_group in stats.values():
+            stat_hash = stat_group["statHash"]
+            stat_value = stat_group["value"]
+
+            stat_name = (
+                manifest_table["DestinyStatDefinition"]
+                .get(int(stat_hash), {})
+                .get("displayProperties", {})
+                .get("name")
+            )
+            if stat_name:
+                self._stats[stat_name] = stat_value
+
+        return self
+
+    @property
+    def stats(self) -> dict:
+        return self._stats
+
+    def with_perks(
+        self,
+        perks: t.Dict[str, t.Dict[str, t.Any]]
+        | t.Dict[str, t.Dict[str, t.Dict[str, t.Any]]],
+        manifest_table: dict,
+    ) -> t.Self:
+        self._perks = []
+
+        if not perks:
+            return self
+
+        if "perks" in perks:
+            perks = perks["perks"]
+
+        for perk_group in perks:
+            perk_group: t.Dict[str, t.Any]
+            perk_entry = manifest_table["DestinySandboxPerkDefinition"][
+                perk_group["perkHash"]
+            ]
+            perk_name = perk_entry["displayProperties"]["name"]
+
+            if not perk_name:
+                continue
+
+            self._perks.append(perk_name)
+
+        return self
+
+    @property
+    def perks(self) -> t.List[str]:
+        return self._perks
 
 
 class DestinyWeapon(DestinyItem):
     def __init__(self, *, perks: t.Tuple[t.Tuple[str]] = None, **kwargs):
         super().__init__(**kwargs)
-        self.perks = perks
+        self._perks = perks
 
     @staticmethod
     def _plugs_to_perks(
-        plugs_array: t.List[dict], manifest_table: dict
+        plugs_array: t.Dict[str, list], manifest_table: dict
     ) -> t.Tuple[str]:
         # CAUTION: This cannot yet differentiate between masterworks, kill trackets and
         #          actual perks
@@ -440,8 +544,8 @@ class DestinyWeapon(DestinyItem):
 
         return tuple(perks)
 
-    def with_reusable_plugs(self, plugs: t.List[dict], manifest_table: dict):
-        self.perks = self._plugs_to_perks(plugs, manifest_table)
+    def with_reusable_plugs(self, plugs: t.Dict[str, list], manifest_table: dict):
+        self._perks = self._plugs_to_perks(plugs, manifest_table)
         return self
 
     def __repr__(self):
@@ -457,10 +561,6 @@ class DestinyWeapon(DestinyItem):
         for perk_group in perks:
             _perks.append(" / ".join(perk_group))
         return " + ".join(_perks)
-
-    @property
-    def expected_emoji_name(self) -> str:
-        return self.item_type_friendly_name.replace(" ", "_").replace("-", "_").lower()
 
 
 class DestinyArmor(DestinyItem):
@@ -569,9 +669,10 @@ class DestinyArmor(DestinyItem):
                         if stat_name and stat_name in self.stats:
                             self.stats[stat_name] += stat_value
 
-    def with_reusable_plugs(self, plugs: t.List[dict], manifest_table: dict):
-        self._plugs_to_stats(plugs, manifest_table)
-        self._add_intrinsic_stats(manifest_table)
+    def with_reusable_plugs(self, plugs: t.Dict[str, list], manifest_table: dict):
+        self._plugs = plugs
+        # self._plugs_to_stats(plugs, manifest_table)
+        # self._add_intrinsic_stats(manifest_table)
         return self
 
     @property
@@ -721,16 +822,20 @@ class DestinyVendor:
             location = None
 
         _sale_items: dict = response["sales"]["data"]
-        _plugs_for_sale_items: dict = response["itemComponents"]["reusablePlugs"][
-            "data"
-        ]
+        # _plugs_for_sale_items: dict = response["itemComponents"]["reusablePlugs"][
+        #     "data"
+        # ]
+        _stats_for_sale_items: dict = response["itemComponents"]["stats"]["data"]
+        _perks_for_sale_items: dict = response["itemComponents"]["perks"]["data"]
 
         destiny_items_for_sale = []
         for _sale_item_key in _sale_items.keys():
-            _plugs_for_sale_item = _plugs_for_sale_items.get(_sale_item_key, {})
+            # _plugs_for_sale_item = _plugs_for_sale_items.get(_sale_item_key, {})
             _destiny_item_for_sale = DestinyItem.from_sale_item(
                 sale_item=_sale_items[_sale_item_key],
-                reusable_plugs=_plugs_for_sale_item,
+                # reusable_plugs=_plugs_for_sale_item,
+                stats=_stats_for_sale_items.get(_sale_item_key, {}),
+                perks=_perks_for_sale_items.get(_sale_item_key, {}),
                 manifest_table=manifest_table,
             )
             destiny_items_for_sale.append(_destiny_item_for_sale)
@@ -755,7 +860,19 @@ class DestinyVendor:
         self.sale_items = sale_items
 
     def __repr__(self):
-        return f"{self.name}" + f" - {self.location}" if self.location else ""
+        repr_ = f"{self.name}" + f" - {self.location}" if self.location else ""
+        repr_ += "\n" + "\n".join(f" - {item}" for item in self.sale_items)
+        return repr_
+
+    # Implement addition of vendors to add their sale items
+    # Keeping all other properties of self
+    def __add__(self, other: t.Self) -> t.Self:
+        return DestinyVendor(
+            name=self.name,
+            hash_=self.hash_,
+            location=self.location,
+            sale_items=self.sale_items + other.sale_items,
+        )
 
 
 # Get a url to send the user to for OAuth
@@ -904,6 +1021,30 @@ async def login(ctx: lb.Context):
     await ctx.respond(f"Please log in at {oauth_url()}")
     await refresh_api_tokens(runner=ctx.app.d.webserver_runner, with_login=True)
     await ctx.edit_last_response(content="Successfully logged in")
+
+
+@bungie.child
+@lb.command(
+    "account_numbers",
+    "Get the character id, destiny membership id and membership type",
+    ephemeral=True,
+    auto_defer=True,
+)
+@lb.implements(lb.SlashSubCommand)
+async def account_numbers(ctx: lb.Context):
+    access_token = await refresh_api_tokens(runner=ctx.app.d.webserver_runner)
+
+    async with aiohttp.ClientSession() as session:
+        destiny_membership = await DestinyMembership.from_api(session, access_token)
+        character_id = await destiny_membership.get_character_id(session, access_token)
+
+    await ctx.respond(
+        "```"
+        f"Destiny Character ID: {character_id}\n"
+        f"Destiny Membership ID: {destiny_membership.membership_id}\n"
+        f"Destiny Membership Type: {destiny_membership.membership_type}"
+        "```"
+    )
 
 
 def register(bot: lb.BotApp):
