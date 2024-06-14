@@ -380,16 +380,15 @@ async def fetch_xur_data(webserver_runner: aiohttp.web.AppRunner) -> api.Destiny
         await api._get_latest_manifest(schemas.BungieCredentials.api_key)
     )
 
-    # xur: api.DestinyVendor = await api.DestinyVendor.request_from_api(
-    #     destiny_membership=destiny_membership,
-    #     character_id=character_id,
-    #     access_token=access_token,
-    #     manifest_table=manifest_table,
-    #     vendor_hash=api.XUR_VENDOR_HASH,
-    # )
+    xur: api.DestinyVendor = await api.DestinyVendor.request_from_api(
+        destiny_membership=destiny_membership,
+        character_id=character_id,
+        access_token=access_token,
+        manifest_table=manifest_table,
+        vendor_hash=api.XUR_VENDOR_HASH,
+    )
 
-    xur = await api.DestinyVendor.request_from_api(
-        # xur += await api.DestinyVendor.request_from_api(
+    xur += await api.DestinyVendor.request_from_api(
         destiny_membership=destiny_membership,
         character_id=character_id,
         access_token=access_token,
@@ -411,6 +410,7 @@ async def xur_discord_announcer(
     construct_message_coro: t.Coroutine[t.Any, t.Any, HMessage] = None,
     check_enabled: bool = False,
     enabled_check_coro: t.Coroutine[t.Any, t.Any, bool] = None,
+    publish_message: bool = True,
 ):
     hmessage = HMessage(
         embeds=[
@@ -460,8 +460,8 @@ async def xur_discord_announcer(
             await aio.sleep(min(2**retries, 300))
         else:
             break
-
-    await utils.crosspost_message_with_retries(bot, channel_id, msg.id)
+    if publish_message:
+        await utils.crosspost_message_with_retries(bot, channel_id, msg.id)
 
 
 async def on_start_schedule_autoposts(event: lb.LightbulbStartedEvent):

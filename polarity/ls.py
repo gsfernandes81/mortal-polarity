@@ -233,6 +233,7 @@ async def discord_announcer(
     construct_message_coro: t.Coroutine[t.Any, t.Any, HMessage] = None,
     check_enabled: bool = False,
     enabled_check_coro: t.Coroutine[t.Any, t.Any, bool] = None,
+    publish_message: bool = True,
 ):
     while True:
         retries = 0
@@ -252,7 +253,7 @@ async def discord_announcer(
         bot,
         hmessage,
         channel_id=channel_id,
-        crosspost=True,
+        crosspost=publish_message,
         deduplicate=True,
     )
     logger.info("Announced lost sector to discord")
@@ -349,7 +350,7 @@ def register(bot: lb.BotApp) -> None:
         schemas.AutoPostSettings.set_lost_sector,
         cfg.followables["lost_sector"],
         format_sector,
-        discord_announcer,
+        message_announcer_coro=discord_announcer,
     )
 
     autopost_control_parent_group.child(control_legendary_weapons)

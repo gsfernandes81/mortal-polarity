@@ -73,10 +73,16 @@ def make_autopost_control_commands(
             )
 
     @parent_group.child
-    @lb.command("send", "Trigger a discord announcement manually", auto_defer=True)
+    @lb.option("publish", "Publish the announcement", bool, default=True)
+    @lb.command(
+        "send",
+        "Trigger a discord announcement manually",
+        auto_defer=True,
+        pass_options=True,
+    )
     @lb.implements(lb.SlashSubCommand)
     @utils.check_admin
-    async def manual_announce(ctx: lb.Context):
+    async def manual_announce(ctx: lb.Context, publish: bool):
         await ctx.respond("Announcing...")
         try:
             await message_announcer_coro(
@@ -84,6 +90,7 @@ def make_autopost_control_commands(
                 channel_id=channel_id,
                 check_enabled=False,
                 construct_message_coro=message_constructor_coro,
+                publish_message=publish,
             )
         except Exception as e:
             logger.exception(e)
