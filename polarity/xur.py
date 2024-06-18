@@ -108,16 +108,15 @@ def costs_string_from_items(
     if not costs:
         return ""
 
-    costs_line = "💰 Cost: "
+    costs_line = "Cost:  "
     if len(costs) == 1:
         # exotic_weapons_fragment_ +=
         for currency, amount in costs.pop().items():
             emoji_name = api.likely_emoji_name(currency)
             if emoji_name not in emoji_include_list:
-                costs_line = f"{costs_line}`{amount}`x {currency} "
+                costs_line = f"{costs_line}{currency} x{amount} "
             else:
-                costs_line = f"{costs_line}`{amount}`x :{emoji_name}: "
-        costs_line += "each"
+                costs_line = f"{costs_line}:{emoji_name}: x{amount} "
     elif len(costs) > 1:
         costs_line = "Costs vary per item"
 
@@ -141,6 +140,7 @@ def exotic_armor_fragment(
     return (
         "## **__Exotic Armor__**\n"
         + costs_string_from_items(exotic_armor_pieces, allowed_emoji_list)
+        + "\n\n"
         + "\n\n".join(subfragments)
         + "\n"
     )
@@ -199,7 +199,7 @@ def exotic_weapons_fragment(
     exotic_weapons_fragment_ = "## **__Exotic Weapons__**\n"
 
     exotic_weapons_fragment_ += (
-        costs_string_from_items(exotic_weapons, emoji_include_list) + "\n"
+        costs_string_from_items(exotic_weapons, emoji_include_list) + "\n\n"
     )
 
     for exotic_weapon in exotic_weapons:
@@ -222,7 +222,7 @@ def exotic_catalysts_fragment(
     exotic_catalysts_fragment_ = "## **__Exotic Catalysts__**\n"
 
     exotic_catalysts_fragment_ += (
-        costs_string_from_items(exotic_catalysts, emoji_include_list) + "\n"
+        costs_string_from_items(exotic_catalysts, emoji_include_list) + "\n\n"
     )
 
     for exotic_catalyst in exotic_catalysts:
@@ -256,6 +256,7 @@ def legendary_armor_fragement(
     subfragments.append(
         costs_string_from_items(legendary_armor_pieces, emoji_include_list)
     )
+    subfragments.append("")
 
     for armor_set_name in armor_sets:
         armor_set = xur_armor_sets_data[armor_set_name]
@@ -293,6 +294,7 @@ def legendary_weapons_fragment(
     subfragments.append("## **__Legendary Weapons__**")
 
     subfragments.append(costs_string_from_items(legendary_weapons, emoji_include_list))
+    subfragments.append("")
 
     for weapon in legendary_weapons:
         subfragments.append(
