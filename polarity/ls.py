@@ -178,41 +178,24 @@ async def format_sector(
         construct_emoji_substituter(emoji_dict), legendary_weapon_rewards
     )
 
-    embed = (
-        h.Embed(
-            title="**Lost Sector Today**",
-            description=(
-                f"{emoji_dict['LS']}{utils.space.three_per_em}{sector_name.strip()}\n"
-                + (
-                    f"{emoji_dict['location']}{utils.space.three_per_em}{sector_location.strip()}"
-                    if sector_location
-                    else ""
-                )
-            ),
-            color=cfg.embed_default_color,
-            url="https://lostsectortoday.com/",
-        )
-        .add_field(
-            name="Reward",
-            value=str(emoji_dict["exotic_engram"])
-            + f"{utils.space.three_per_em}Exotic {sector.reward} (If-Solo)",
-        )
-        .add_field(
-            name="Champs and Shields",
-            value=format_counts(sector.legend_data, sector.master_data, emoji_dict),
-        )
-        .add_field(
-            name="Elementals",
-            value=f"Surge: {utils.space.punctuation}{utils.space.hair}{utils.space.hair}"
-            + " ".join(surges)
-            + f"\nThreat: {threat}",
-        )
-        .add_field(
-            name="Modifiers",
-            value=str(emoji_dict["swords"])
-            + f"{utils.space.three_per_em}{sector.to_sector_v1().modifiers}"
-            + f"\n{overcharged_weapon_emoji}{utils.space.three_per_em}Overcharged {sector.overcharged_weapon}",
-        )
+    embed = h.Embed(
+        title="**Lost Sector Today**",
+        description=(
+            f"{emoji_dict['LS']}{utils.space.three_per_em}{sector_name.strip()}\n"
+            + (
+                f"{emoji_dict['location']}{utils.space.three_per_em}{sector_location.strip()}"
+                if sector_location
+                else ""
+            )
+        ),
+        color=cfg.embed_default_color,
+        url="https://lostsectortoday.com/",
+    )
+
+    embed.add_field(
+        name="Rewards (If-Solo)",
+        value=str(emoji_dict["exotic_engram"])
+        + f"{utils.space.three_per_em}Exotic {sector.reward}",
     )
 
     if await schemas.AutoPostSettings.get_lost_sector_legendary_weapons_enabled():
@@ -220,6 +203,28 @@ async def format_sector(
             "Legendary Weapons (If-Solo)",
             legendary_weapon_rewards,
         )
+
+        embed.add_field(
+            "Drop Rate (with no champions left)",
+            "Expert: 70%\n" "Master: 100% + double perks on weapons",
+        )
+
+    embed.add_field(
+        name="Champs and Shields",
+        value=format_counts(sector.legend_data, sector.master_data, emoji_dict),
+    )
+    embed.add_field(
+        name="Elementals",
+        value=f"Surge: {utils.space.punctuation}{utils.space.hair}{utils.space.hair}"
+        + " ".join(surges)
+        + f"\nThreat: {threat}",
+    )
+    embed.add_field(
+        name="Modifiers",
+        value=str(emoji_dict["swords"])
+        + f"{utils.space.three_per_em}{sector.to_sector_v1().modifiers}"
+        + f"\n{overcharged_weapon_emoji}{utils.space.three_per_em}Overcharged {sector.overcharged_weapon}",
+    )
 
     if ls_gfx_url:
         embed.set_image(ls_gfx_url)
