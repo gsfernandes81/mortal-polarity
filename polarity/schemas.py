@@ -48,10 +48,10 @@ class AutoPostSettings(Base):
     def __init__(
         self,
         id: int = 1,
-        discord_autopost_enabled=False,
+        enabled=False,
     ):
         self.id = id
-        self.lost_sector_autopost_enabled = discord_autopost_enabled
+        self.enabled = enabled
 
     @classmethod
     @utils.ensure_session(db_session)
@@ -96,6 +96,14 @@ class AutoPostSettings(Base):
     @classmethod
     async def set_lost_sector_legendary_weapons(cls, enabled: bool):
         return await cls.set_enabled("lost_sector_legendary_weapons", enabled)
+
+    @classmethod
+    async def get_lost_sector_twitter_enabled(cls):
+        return await cls.get_enabled("lost_sector_twitter")
+
+    @classmethod
+    async def set_lost_sector_twitter(cls, enabled: bool):
+        return await cls.set_enabled("lost_sector_twitter", enabled)
 
     @classmethod
     async def get_xur_enabled(cls):
